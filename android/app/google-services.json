@@ -1,0 +1,95 @@
+{
+  "project_info": {
+    "project_number": "467685361541",
+    "project_id": "khet-app-2025",
+    "storage_bucket": "khet-app-2025.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:467685361541:android:5bb1042a303de7cc06a6ec",
+        "android_client_info": {
+          "package_name": "com.jiifto.jiffto"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDivmLl0hPtqx0D3qUpfc5HLf7FNJ-07fU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:467685361541:android:594a1c637cb38ac106a6ec",
+        "android_client_info": {
+          "package_name": "com.khet.seva.khetseva"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "467685361541-1ea8steq31umv0ukp7mtufd0bqdj8mlf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.khet.seva.khetseva",
+            "certificate_hash": "eebe68a1593a9d4198420784f16eeaee96427f7a"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDivmLl0hPtqx0D3qUpfc5HLf7FNJ-07fU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:467685361541:android:2925ac00d7d5aaf506a6ec",
+        "android_client_info": {
+          "package_name": "com.khetseva.khet_seva"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDivmLl0hPtqx0D3qUpfc5HLf7FNJ-07fU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:467685361541:android:ffc3fdab80c2b44006a6ec",
+        "android_client_info": {
+          "package_name": "com.todo.todo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDivmLl0hPtqx0D3qUpfc5HLf7FNJ-07fU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
