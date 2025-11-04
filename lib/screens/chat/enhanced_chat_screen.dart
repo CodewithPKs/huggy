@@ -1,12 +1,12 @@
-// File: lib/screens/chat/enhanced_chat_screen.dart
+// File: lib/screens/chat/enhanced_chat_screen.dart (UPDATED VERSION 2)
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../../services/enhanced_chat_service.dart';
 
 class EnhancedChatScreen extends StatefulWidget {
@@ -24,8 +24,10 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
 
   bool _isLoading = false;
   bool _isSending = false;
+  bool _showEmojiPicker = false;
   String _selectedFilter = 'all';
   Map<String, VideoPlayerController> _videoControllers = {};
+  Map<String, double> _uploadProgress = {}; // Track upload progress by messageId
 
   @override
   void initState() {
@@ -61,6 +63,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
 
     final message = _messageController.text.trim();
     _messageController.clear();
+    setState(() => _showEmojiPicker = false);
 
     setState(() => _isSending = true);
 
@@ -82,16 +85,59 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
     try {
       final image = await _imagePicker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        setState(() => _isSending = true);
-        await _chatService.sendImageMessage(
-          imagePath: image.path,
-          fileName: image.name,
-        );
-        _scrollToBottom();
-        if (mounted) _showSnackBar('Image sent successfully');
+        setState(() {
+          _isSending = true;
+          _uploadProgress['image'] = 0.0;
+        });
+
+        try {
+          await _chatService.sendImageMessage(
+            imagePath: image.path,
+            fileName: image.name,
+          );
+          _scrollToBottom();
+          if (mounted) _showSnackBar('Image sent successfully');
+        } finally {
+          if (mounted) {
+            setState(() {
+              _uploadProgress.remove('image');
+            });
+          }
+        }
       }
     } catch (e) {
       if (mounted) _showSnackBar('Error sending image: $e');
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _pickAndSendCamera() async {
+    try {
+      final image = await _imagePicker.pickImage(source: ImageSource.camera);
+      if (image != null) {
+        setState(() {
+          _isSending = true;
+          _uploadProgress['camera'] = 0.0;
+        });
+
+        try {
+          await _chatService.sendImageMessage(
+            imagePath: image.path,
+            fileName: image.name,
+          );
+          _scrollToBottom();
+          if (mounted) _showSnackBar('Photo sent successfully');
+        } finally {
+          if (mounted) {
+            setState(() {
+              _uploadProgress.remove('camera');
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) _showSnackBar('Error sending photo: $e');
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -101,23 +147,33 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
     try {
       final video = await _imagePicker.pickVideo(source: ImageSource.gallery);
       if (video != null) {
-        setState(() => _isSending = true);
+        setState(() {
+          _isSending = true;
+          _uploadProgress['video'] = 0.0;
+        });
 
-        // Get video duration
-        final controller = VideoPlayerController.file(
-          _parseFilePath(video.path),
-        );
-        await controller.initialize();
-        final duration = controller.value.duration;
-        controller.dispose();
+        try {
+          final controller = VideoPlayerController.file(
+            _parseFilePath(video.path),
+          );
+          await controller.initialize();
+          final duration = controller.value.duration;
+          controller.dispose();
 
-        await _chatService.sendVideoMessage(
-          videoPath: video.path,
-          fileName: video.name,
-          duration: duration,
-        );
-        _scrollToBottom();
-        if (mounted) _showSnackBar('Video sent successfully');
+          await _chatService.sendVideoMessage(
+            videoPath: video.path,
+            fileName: video.name,
+            duration: duration,
+          );
+          _scrollToBottom();
+          if (mounted) _showSnackBar('Video sent successfully');
+        } finally {
+          if (mounted) {
+            setState(() {
+              _uploadProgress.remove('video');
+            });
+          }
+        }
       }
     } catch (e) {
       if (mounted) _showSnackBar('Error sending video: $e');
@@ -135,20 +191,44 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
-        setState(() => _isSending = true);
+        setState(() {
+          _isSending = true;
+          _uploadProgress['document'] = 0.0;
+        });
 
-        await _chatService.sendDocumentMessage(
-          docPath: file.path ?? '',
-          fileName: file.name,
-          mimeType: file.extension ?? 'bin',
-        );
-        _scrollToBottom();
-        if (mounted) _showSnackBar('Document sent successfully');
+        try {
+          await _chatService.sendDocumentMessage(
+            docPath: file.path ?? '',
+            fileName: file.name,
+            mimeType: file.extension ?? 'bin',
+          );
+          _scrollToBottom();
+          if (mounted) _showSnackBar('Document sent successfully');
+        } finally {
+          if (mounted) {
+            setState(() {
+              _uploadProgress.remove('document');
+            });
+          }
+        }
       }
     } catch (e) {
       if (mounted) _showSnackBar('Error sending document: $e');
     } finally {
       if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _sendVoiceMessage() async {
+    // TODO: Implement voice message recording
+    // For now, show a placeholder
+    _showSnackBar('Voice message feature coming soon!');
+  }
+
+  void _onEmojiSelected(Category? category, Emoji emoji) {
+    _messageController.text += emoji.emoji;
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -177,8 +257,9 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Personal Chat'),
+        title: const Text('Take Help'),
         centerTitle: true,
+        elevation: 0,
         actions: [
           PopupMenuButton(
             itemBuilder: (context) => [
@@ -261,8 +342,57 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
               },
             ),
           ),
+          // Upload progress indicator
+          if (_uploadProgress.isNotEmpty)
+            _buildUploadProgressBar(),
           // Message input
           _buildMessageInput(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadProgressBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: const Color(0xFF2A2A2A),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Uploading...',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          ..._uploadProgress.entries.map((entry) {
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: entry.value,
+                          minHeight: 6,
+                          backgroundColor: const Color(0xFF404040),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF6366F1),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${(entry.value * 100).toStringAsFixed(0)}%',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            );
+          }).toList(),
         ],
       ),
     );
@@ -369,11 +499,11 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                data['fileName'] ?? 'Image',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
-              ),
+              // const SizedBox(height: 4),
+              // Text(
+              //   data['fileName'] ?? 'Image',
+              //   style: const TextStyle(fontSize: 12, color: Colors.white70),
+              // ),
             ],
           ),
         );
@@ -385,11 +515,11 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               _buildVideoPreview(data['videoUrl'], messageId),
-              const SizedBox(height: 4),
-              Text(
-                '${data['fileName']} (${_formatDuration(data['duration'] ?? 0)})',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
-              ),
+              // const SizedBox(height: 4),
+              // Text(
+              //   '${data['fileName']} (${_formatDuration(data['duration'] ?? 0)})',
+              //   style: const TextStyle(fontSize: 12, color: Colors.white70),
+              // ),
             ],
           ),
         );
@@ -661,92 +791,206 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
   Widget _buildMessageInput() {
     return Container(
       color: const Color(0xFF1E1E1E),
-      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Media buttons
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          // Media buttons row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildMediaIconButton(
+                    icon: Icons.camera_alt_outlined,
+                    label: 'Camera',
+                    onPressed: _isSending ? null : _pickAndSendCamera,
+                  ),
+                  _buildMediaIconButton(
+                    icon: Icons.image_outlined,
+                    label: 'Gallery',
+                    onPressed: _isSending ? null : _pickAndSendImage,
+                  ),
+                  _buildMediaIconButton(
+                    icon: Icons.videocam_outlined,
+                    label: 'Video',
+                    onPressed: _isSending ? null : _pickAndSendVideo,
+                  ),
+                  _buildMediaIconButton(
+                    icon: Icons.description_outlined,
+                    label: 'Document',
+                    onPressed: _isSending ? null : _pickAndSendDocument,
+                  ),
+                  _buildMediaIconButton(
+                    icon: Icons.mic_outlined,
+                    label: 'Voice',
+                    onPressed: _isSending ? null : _sendVoiceMessage,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Text input field with emoji button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                _buildMediaButton(
-                  icon: Icons.image_outlined,
-                  label: 'Image',
-                  onPressed: _pickAndSendImage,
+                // Emoji button
+                IconButton(
+                  icon: const Icon(Icons.emoji_emotions_outlined),
+                  onPressed: () {
+                    setState(() => _showEmojiPicker = !_showEmojiPicker);
+                  },
                 ),
-                _buildMediaButton(
-                  icon: Icons.videocam_outlined,
-                  label: 'Video',
-                  onPressed: _pickAndSendVideo,
+                // Text field
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      hintStyle: const TextStyle(color: Colors.white38),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF404040),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF404040),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF6366F1),
+                          width: 2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      suffixIcon: _messageController.text.isNotEmpty
+                          ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _messageController.clear();
+                          setState(() {});
+                        },
+                      )
+                          : null,
+                    ),
+                    maxLines: null,
+                    textInputAction: TextInputAction.send,
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _isSending ? null : _sendMessage(),
+                    enabled: !_isSending,
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
-                _buildMediaButton(
-                  icon: Icons.description_outlined,
-                  label: 'Document',
-                  onPressed: _pickAndSendDocument,
+                const SizedBox(width: 8),
+                // Send button
+                FloatingActionButton(
+                  onPressed: _isSending || _messageController.text.trim().isEmpty
+                      ? null
+                      : _sendMessage,
+                  mini: true,
+                  backgroundColor: _messageController.text.trim().isEmpty
+                      ? Colors.grey
+                      : const Color(0xFF6366F1),
+                  child: _isSending
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  )
+                      : const Icon(Icons.send),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          // Text input and send
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+          // Emoji picker
+          if (_showEmojiPicker)
+            SizedBox(
+              height: 250,
+              child: EmojiPicker(
+                onEmojiSelected: _onEmojiSelected,
+                onBackspacePressed: () {
+                  if (_messageController.text.isNotEmpty) {
+                    _messageController.text = _messageController.text
+                        .substring(0, _messageController.text.length - 1);
+                    setState(() {});
+                  }
+                },
+                config: Config(
+                  // columns: 7,
+                  // emojiSizeMax: 32,
+                  // verticalSpacing: 0,
+                  // horizontalSpacing: 0,
+                  // gridPadding: EdgeInsets.zero,
+                  // initCategory: Category.RECENT,
+                  // bgColor: const Color(0xFF2A2A2A),
+                  // indicatorColor: const Color(0xFF6366F1),
+                  // iconColor: Colors.white,
+                  // iconColorSelected: const Color(0xFF6366F1),
+                  // backspaceColor: const Color(0xFF6366F1),
+                  // skinToneIndicatorColor: const Color(0xFF6366F1),
+                  categoryViewConfig: const CategoryViewConfig(
+                    backgroundColor: Color(0xFF2A2A2A),
+                    indicatorColor: Color(0xFF6366F1),
+                    iconColorSelected: Color(0xFF6366F1),
+                    // categoryIcon: CategoryIcon.CATEGORY,
                   ),
-                  maxLines: null,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _isSending ? null : _sendMessage(),
-                  enabled: !_isSending,
                 ),
               ),
-              const SizedBox(width: 8),
-              FloatingActionButton(
-                onPressed: _isSending ? null : _sendMessage,
-                mini: true,
-                child: _isSending
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(Colors.white),
-                  ),
-                )
-                    : const Icon(Icons.send),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildMediaButton({
+  Widget _buildMediaIconButton({
     required IconData icon,
     required String label,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
   }) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ElevatedButton.icon(
-        onPressed: _isSending ? null : onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF2A2A2A),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A2A2A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: onPressed == null
+                    ? Colors.grey
+                    : const Color(0xFF6366F1).withOpacity(0.3),
+              ),
+            ),
+            child: IconButton(
+              icon: Icon(icon),
+              onPressed: onPressed,
+              iconSize: 20,
+              constraints: const BoxConstraints(
+                minHeight: 44,
+                minWidth: 44,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: onPressed == null ? Colors.grey : Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -779,7 +1023,6 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> {
   }
 
   _parseFilePath(String path) {
-    // Helper to convert file path to File object
     return File(path);
   }
 }
