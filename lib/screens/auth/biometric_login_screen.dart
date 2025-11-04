@@ -25,6 +25,11 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
     super.initState();
     _initializeBiometric();
     _checkUserAuthStatus();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoAuthenticate();
+    });
+
   }
 
   Future<void> _initializeBiometric() async {
@@ -50,6 +55,21 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
       });
     // }
   }
+
+  Future<void> _autoAuthenticate() async {
+    // Wait until biometrics are checked
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (_isBiometricAvailable) {
+      // Automatically trigger fingerprint scan
+      _authenticateWithBiometric();
+    } else {
+      setState(() {
+        _statusMessage = 'Biometric not available on this device.';
+      });
+    }
+  }
+
 
   Future<void> _authenticateWithBiometric() async {
     if (!_isBiometricAvailable) {
