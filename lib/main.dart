@@ -23,8 +23,8 @@ class MyApp extends StatelessWidget {
       title: 'Dual Access App',
       debugShowCheckedModeBanner: false,
       theme: darkTheme,
-      // home: const TodoHomeScreen(),
-      home: const EnhancedChatScreen(),
+      home: const TodoHomeScreen(),
+      // home: const EnhancedChatScreen(),
     );
 
   }
