@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:todo/screens/todo/todo_home_screen.dart';
 import 'firebase_options.dart';
 import 'screens/auth/biometric_login_screen.dart';
 import 'theme/dark_theme.dart';
@@ -21,7 +22,7 @@ class MyApp extends StatelessWidget {
       title: 'Dual Access App',
       debugShowCheckedModeBanner: false,
       theme: darkTheme,
-      home: const BiometricLoginScreen(),
+      home: const TodoHomeScreen(),
     );
   }
 }

@@ -1,9 +1,9 @@
 // File: lib/screens/auth/biometric_setup_screen.dart
 import 'package:flutter/material.dart';
 import '../../services/biometric_service.dart';
-import '../../services/firebase_auth_service.dart';
 import '../chat/chat_home_screen.dart';
 import '../todo/todo_home_screen.dart';
+import 'biometric_login_screen.dart';
 
 class BiometricSetupScreen extends StatefulWidget {
   const BiometricSetupScreen({Key? key}) : super(key: key);
@@ -14,10 +14,9 @@ class BiometricSetupScreen extends StatefulWidget {
 
 class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   final BiometricService _biometricService = BiometricService();
-  final FirebaseAuthService _authService = FirebaseAuthService();
   int _currentStep = 0;
   bool _isAuthenticating = false;
-  String _statusMessage = '';
+  String _statusMessage = 'Tap "Setup Fingerprint 1" to begin';
 
   @override
   void initState() {
@@ -25,10 +24,12 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     _statusMessage = 'Tap "Setup Fingerprint 1" to begin';
   }
 
+  /// Enhanced setup that stores fingerprint data to Firestore
   Future<void> _setupFingerprint(int fingerprintNumber) async {
     setState(() {
       _isAuthenticating = true;
-      _statusMessage = 'Place your finger on the sensor...';
+      _statusMessage =
+      'Place your finger on the sensor for fingerprint $fingerprintNumber...';
     });
 
     try {
@@ -39,36 +40,27 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
       );
 
       if (isAuthenticated) {
-        // Generate a unique ID for this fingerprint
-        final fingerprintId =
-            'fingerprint_${fingerprintNumber}_${DateTime.now().millisecondsSinceEpoch}';
-
-        // Store in Firebase
-        final stored = await _authService.storeBiometricId(
-          fingerprintId: fingerprintId,
+        // Store fingerprint data directly to Firestore
+        final stored = await _biometricService.storeFingerprintData(
           fingerprintNumber: fingerprintNumber,
         );
 
-        if (stored) {
+        if (stored && mounted) {
           setState(() {
             _currentStep = fingerprintNumber;
             if (fingerprintNumber == 1) {
-              _statusMessage = 'Fingerprint 1 saved! Set up Fingerprint 2 next.';
+              _statusMessage =
+              'Fingerprint 1 saved! Set up Fingerprint 2 next.';
             } else {
               _statusMessage = 'All fingerprints configured! Ready to go.';
             }
           });
 
           if (fingerprintNumber == 2) {
-            // Show completion dialog
             _showCompletionDialog();
           }
-        } else {
-          if (mounted) {
-            setState(() {
-              _statusMessage = 'Failed to save fingerprint. Try again.';
-            });
-          }
+        } else if (mounted) {
+          _showErrorDialog('Failed to save fingerprint. Try again.');
         }
       } else {
         if (mounted) {
@@ -79,9 +71,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _statusMessage = 'Error: $e';
-        });
+        _showErrorDialog('Error: $e');
       }
     } finally {
       if (mounted) {
@@ -102,7 +92,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         content: const Text(
           'Both fingerprints are now configured.\n\n'
               'Fingerprint 1 → Chat App\n'
-              'Fingerprint 2 → To-Do App',
+              'Fingerprint 2 → To-Do App\n\n'
+              'The system will automatically detect which finger you use '
+              'and open the correct app!',
         ),
         actions: [
           TextButton(
@@ -110,10 +102,12 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
               Navigator.pop(context);
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => const ChatHomeScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const BiometricLoginScreen(),
+                ),
               );
             },
-            child: const Text('Continue to Chat'),
+            child: const Text('Continue to Login'),
           ),
         ],
       ),
@@ -141,7 +135,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('Continue?'),
         content: const Text(
-          'You can set up fingerprints later in settings.\n\n'
+          'You can set up fingerprints later.\n\n'
               'Would you like to access a module now?',
         ),
         actions: [
@@ -164,6 +158,23 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
               );
             },
             child: const Text('To-Do'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -313,9 +324,11 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '• Each fingerprint provides access to a different module\n'
-                              '• Use your assigned finger to unlock the appropriate app\n'
-                              '• You can change fingerprints later in settings',
+                          '• Use your assigned finger to access the correct module\n'
+                              '• Fingerprint 1 opens Chat automatically\n'
+                              '• Fingerprint 2 opens To-Do automatically\n'
+                              '• Data is stored directly in Firebase\n'
+                              '• No email login needed - personal use only',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],

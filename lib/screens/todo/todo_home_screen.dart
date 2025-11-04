@@ -1,8 +1,10 @@
 // File: lib/screens/todo/todo_home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/firebase_auth_service.dart';
+import '../../services/biometric_service.dart';
 import '../../services/todo_service.dart';
+import '../../services/voice_activation_service.dart';
+import '../chat/chat_home_screen.dart';
 import 'add_task_screen.dart';
 import 'task_detail_screen.dart';
 
@@ -15,25 +17,86 @@ class TodoHomeScreen extends StatefulWidget {
 
 class _TodoHomeScreenState extends State<TodoHomeScreen>
     with SingleTickerProviderStateMixin {
-  final FirebaseAuthService _authService = FirebaseAuthService();
-  final TodoService _todoService = TodoService();
-  late String _currentUserId;
+  final VoiceActivationService _voiceService = VoiceActivationService();
+  final BiometricService _biometricService = BiometricService();
+  late final TodoService _todoService; // ✅ non-nullable and initialized
+
   late TabController _tabController;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
-    _currentUserId = _authService.currentUser?.uid ?? '';
+    _todoService = TodoService(); // ✅ Initialize service here
     _tabController = TabController(length: 3, vsync: this);
+    _initializeVoiceActivation();
+  }
+
+  Future<void> _initializeVoiceActivation() async {
+    final available = await _voiceService.initializeSpeech();
+    if (available) {
+      print('✓ Voice activation ready');
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _voiceService.dispose();
     super.dispose();
+  }
+
+  Future<void> _startVoiceListening() async {
+    setState(() => _isListening = true);
+    try {
+      final recognizedText = await _voiceService.startListening();
+
+      if (recognizedText != null &&
+          _voiceService.isActivationKeywordDetected(recognizedText)) {
+        _authenticateAndOpenChat();
+      } else {
+        setState(() => _isListening = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Say "Open the Praveen" to access chat'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isListening = false);
+      print('Error: $e');
+    }
+  }
+
+  Future<void> _authenticateAndOpenChat() async {
+    try {
+      final authenticated = await _biometricService.authenticate(
+        reason: 'Authenticate to access chat',
+        stickyAuth: true,
+      );
+
+      if (authenticated && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ChatHomeScreen()),
+        );
+      }
+    } catch (e) {
+      print('Authentication error: $e');
+      setState(() => _isListening = false);
+    }
+  }
+
+  void _checkTextInput(String text) {
+    if (_voiceService.isActivationKeywordDetected(text)) {
+      _authenticateAndOpenChat();
+    }
   }
 
   @override
@@ -52,15 +115,19 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              _isListening ? Icons.mic : Icons.mic_none,
+              color: _isListening ? Colors.red : Colors.white,
+            ),
+            onPressed: _isListening ? null : _startVoiceListening,
+            tooltip: 'Voice activation: Say "Open the Praveen"',
+          ),
           PopupMenuButton(
             itemBuilder: (context) => [
               PopupMenuItem(
                 child: const Text('Settings'),
                 onTap: () => _navigateToSettings(),
-              ),
-              PopupMenuItem(
-                child: const Text('Logout'),
-                onTap: () => _handleLogout(),
               ),
             ],
           ),
@@ -68,13 +135,13 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Search bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search tasks...',
+                hintText: 'Search tasks... (or say "Open the Praveen")',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -91,14 +158,15 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
               ),
               onChanged: (value) {
                 setState(() => _searchQuery = value);
+                _checkTextInput(value);
               },
             ),
           ),
-          // Task Statistics
+          // Task stats
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: FutureBuilder<Map<String, int>>(
-              future: _todoService.getTaskStats(_currentUserId),
+              future: _todoService.getTaskStats(_getCurrentUserId()),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const SizedBox.shrink();
@@ -109,36 +177,46 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildStatCard('Total', stats['total']?.toString() ?? '0'),
-                    _buildStatCard(
-                      'Pending',
-                      stats['pending']?.toString() ?? '0',
-                    ),
-                    _buildStatCard(
-                      'Completed',
-                      stats['completed']?.toString() ?? '0',
-                    ),
+                    _buildStatCard('Pending', stats['pending']?.toString() ?? '0'),
+                    _buildStatCard('Completed', stats['completed']?.toString() ?? '0'),
                   ],
                 );
               },
             ),
           ),
           const SizedBox(height: 16),
-          // Task Lists
+          // Task lists
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTaskList(_todoService.getUserTasks(_currentUserId)),
-                _buildTaskList(_todoService.getPendingTasks(_currentUserId)),
-                _buildTaskList(_todoService.getCompletedTasks(_currentUserId)),
+                _buildTaskList(_todoService.getUserTasks(_getCurrentUserId())),
+                _buildTaskList(_todoService.getPendingTasks(_getCurrentUserId())),
+                _buildTaskList(_todoService.getCompletedTasks(_getCurrentUserId())),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _navigateToAddTask(),
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'voice',
+            mini: true,
+            backgroundColor: _isListening ? Colors.red : Colors.orange,
+            onPressed: _isListening ? null : _startVoiceListening,
+            tooltip: 'Voice: "Open the Praveen"',
+            child: Icon(_isListening ? Icons.stop : Icons.mic),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'add',
+            onPressed: _navigateToAddTask,
+            tooltip: 'Add task',
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
@@ -158,10 +236,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),
@@ -174,31 +249,19 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
       stream: tasksStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 80,
-                  color: Colors.white24,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No tasks',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Create a new task to get started',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+              children: const [
+                Icon(Icons.check_circle_outline, size: 80, color: Colors.white24),
+                SizedBox(height: 16),
+                Text('No tasks'),
+                SizedBox(height: 8),
+                Text('Create a new task to get started'),
               ],
             ),
           );
@@ -219,98 +282,57 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
   Widget _buildTaskTile(DocumentSnapshot task) {
     final isCompleted = task['isCompleted'] ?? false;
     final priority = task['priority'] ?? 'medium';
-    final dueDate = (task['dueDate'] as Timestamp).toDate();
-    final isOverdue = !isCompleted && dueDate.isBefore(DateTime.now());
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Card(
-        color: isOverdue && !isCompleted
-            ? const Color(0xFF6366F1).withOpacity(0.1)
-            : const Color(0xFF2A2A2A),
+        color: const Color(0xFF2A2A2A),
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Checkbox(
-                    value: isCompleted,
-                    onChanged: (value) {
-                      _todoService.markTaskCompleted(task.id, value ?? false);
-                    },
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TaskDetailScreen(
-                              taskId: task.id,
-                              taskData: task.data() as Map<String, dynamic>,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            task['title'] ?? '',
-                            style: TextStyle(
-                              decoration: isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            task['description'] ?? '',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+              Checkbox(
+                value: isCompleted,
+                onChanged: (value) {
+                  _todoService.markTaskCompleted(task.id, value ?? false);
+                },
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TaskDetailScreen(
+                          taskId: task.id,
+                          taskData: task.data() as Map<String, dynamic>,
+                        ),
                       ),
-                    ),
+                    );
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task['title'] ?? '',
+                        style: TextStyle(
+                          decoration: isCompleted ? TextDecoration.lineThrough : null,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        task['description'] ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  _buildPriorityBadge(priority),
-                ],
+                ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const SizedBox(width: 32),
-                  Icon(
-                    Icons.calendar_today,
-                    size: 14,
-                    color: isOverdue && !isCompleted
-                        ? Colors.red
-                        : Colors.white54,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatDate(dueDate),
-                    style: TextStyle(
-                      color: isOverdue && !isCompleted
-                          ? Colors.red
-                          : Colors.white54,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    onPressed: () {
-                      _todoService.deleteTask(task.id);
-                    },
-                  ),
-                ],
-              ),
+              _buildPriorityBadge(priority),
             ],
           ),
         ),
@@ -342,77 +364,16 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
-  }
+  String _getCurrentUserId() => 'personal_user';
 
   void _navigateToAddTask() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AddTaskScreen(userId: _currentUserId),
-      ),
-    ).then((_) {
-      setState(() {});
-    });
+      MaterialPageRoute(builder: (_) => const AddTaskScreen(userId: '',)),
+    );
   }
 
   void _navigateToSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Settings')),
-          body: ListView(
-            children: [
-              ListTile(
-                title: const Text('Sort By'),
-                onTap: () {},
-              ),
-              ListTile(
-                title: const Text('Filter Tasks'),
-                onTap: () {},
-              ),
-              const Divider(),
-              ListTile(
-                title: const Text('About'),
-                onTap: () {},
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _handleLogout() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _authService.signOut();
-              if (mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/',
-                      (route) => false,
-                );
-              }
-            },
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
+    // Add settings navigation here
   }
 }

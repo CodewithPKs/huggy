@@ -1,10 +1,9 @@
 // File: lib/screens/auth/biometric_login_screen.dart
 import 'package:flutter/material.dart';
 import '../../services/biometric_service.dart';
-import '../../services/firebase_auth_service.dart';
 import '../chat/chat_home_screen.dart';
 import '../todo/todo_home_screen.dart';
-import 'email_login_screen.dart';
+import 'biometric_setup_screen.dart';
 
 class BiometricLoginScreen extends StatefulWidget {
   const BiometricLoginScreen({Key? key}) : super(key: key);
@@ -15,31 +14,34 @@ class BiometricLoginScreen extends StatefulWidget {
 
 class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
   final BiometricService _biometricService = BiometricService();
-  final FirebaseAuthService _authService = FirebaseAuthService();
   bool _isBiometricAvailable = false;
   bool _isAuthenticating = false;
-  String _statusMessage = 'Initialize biometric';
+  String _statusMessage = 'Initializing biometric...';
+  bool _fingerprintsConfigured = false;
 
   @override
   void initState() {
     super.initState();
     _initializeBiometric();
-    _checkUserAuthStatus();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _autoAuthenticate();
     });
-
   }
 
   Future<void> _initializeBiometric() async {
     final isAvailable = await _biometricService.isBiometricAvailable();
     final biometrics = await _biometricService.getAvailableBiometrics();
+    final configured = await _biometricService.areFingerprintsConfigured();
 
     setState(() {
       _isBiometricAvailable = isAvailable;
+      _fingerprintsConfigured = configured;
+
       if (!isAvailable) {
-        _statusMessage = 'Biometric not available';
+        _statusMessage = 'Biometric not available on this device';
+      } else if (!configured) {
+        _statusMessage = 'Fingerprints not configured. Please setup first.';
       } else {
         _statusMessage =
         'Available: ${biometrics.map((b) => b.name).join(", ")}';
@@ -47,70 +49,65 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
     });
   }
 
-  Future<void> _checkUserAuthStatus() async {
-    // if (_authService.isAuthenticated) {
-      // User already authenticated, but we need biometric for module selection
-      setState(() {
-        _statusMessage = 'User authenticated. Use biometric to select module.';
-      });
-    // }
-  }
-
   Future<void> _autoAuthenticate() async {
     // Wait until biometrics are checked
     await Future.delayed(const Duration(milliseconds: 300));
 
-    if (_isBiometricAvailable) {
-      // Automatically trigger fingerprint scan
+    if (_isBiometricAvailable && _fingerprintsConfigured) {
+      // Auto-trigger fingerprint scan
       _authenticateWithBiometric();
-    } else {
-      setState(() {
-        _statusMessage = 'Biometric not available on this device.';
-      });
     }
   }
 
-
+  /// Enhanced authentication with fingerprint detection
   Future<void> _authenticateWithBiometric() async {
     if (!_isBiometricAvailable) {
-      _showErrorDialog('Biometric authentication is not available on this device.');
+      _showErrorDialog(
+        'Biometric authentication is not available on this device.',
+      );
+      return;
+    }
+
+    if (!_fingerprintsConfigured) {
+      _showErrorDialog(
+        'Fingerprints are not configured. Please setup first.',
+      );
       return;
     }
 
     setState(() {
       _isAuthenticating = true;
-      _statusMessage = 'Authenticating...';
+      _statusMessage = 'Place your finger on the sensor...';
     });
 
     try {
-      final isAuthenticated = await _biometricService.authenticate(
+      // Use enhanced authentication that detects which fingerprint
+      final result = await _biometricService.authenticateAndDetectFingerprint(
         reason: 'Authenticate to access your app',
         stickyAuth: true,
       );
 
-      if (isAuthenticated) {
-        // In a real app, you would:
-        // 1. Get the fingerprint ID
-        // 2. Check which fingerprint it is (1 or 2)
-        // 3. Route to appropriate module
+      if (!mounted) return;
 
-        // For this implementation, we'll use a simple approach:
-        // Odd authentication attempts -> Chat, Even -> ToDo
-        // In production, use fingerprint identification system
+      if (result != null && result['success'] == true) {
+        final fingerprintNumber = result['fingerprintNumber'] as int;
+        final responseTime = result['responseTime'] as int;
 
-        if (!mounted) return;
+        print('Authentication successful');
+        print('Fingerprint: $fingerprintNumber');
+        print('Response time: ${responseTime}ms');
 
-        // Simulate fingerprint detection
-        _routeToModule();
+        // Route to module based on fingerprint number
+        _routeToModuleByFingerprint(fingerprintNumber);
       } else {
-        if (!mounted) return;
         setState(() {
           _statusMessage = 'Authentication failed or cancelled';
         });
       }
     } catch (e) {
-      if (!mounted) return;
-      _showErrorDialog('Authentication error: $e');
+      if (mounted) {
+        _showErrorDialog('Authentication error: $e');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -120,30 +117,38 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
     }
   }
 
-  void _routeToModule() {
-    // In production: determine which fingerprint was used
-    // For demo: use random assignment or user preference
-    // You could also use SharedPreferences to remember user's choice
+  /// Route to the appropriate module based on fingerprint number
+  void _routeToModuleByFingerprint(int fingerprintNumber) {
+    if (!mounted) return;
 
-    // For this demo, let's navigate based on user authentication state
-    // if (_authService.isAuthenticated) {
-      // Route based on fingerprint detection
-      // Using a simple approach: alternate between modules
-      _navigateToRandomModule();
-    // } else {
-    //   _navigateToEmailLogin();
-    // }
+    // Fingerprint 1 -> Chat
+    // Fingerprint 2 -> To-Do
+
+    if (fingerprintNumber == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const ChatHomeScreen()),
+      );
+    } else if (fingerprintNumber == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const TodoHomeScreen()),
+      );
+    } else {
+      _showErrorDialog('Unknown fingerprint. Please try again.');
+    }
   }
 
-  void _navigateToRandomModule() {
-    // In production, this would detect actual fingerprint
-    // For demo, we'll let user choose
+  /// Manual module selection (fallback)
+  void _navigateToManualSelection() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('Select Module'),
-        content: const Text('Which module would you like to access?'),
+        content: const Text(
+          'Biometric detection failed. Please select your module:',
+        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -153,7 +158,7 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
                 MaterialPageRoute(builder: (_) => const ChatHomeScreen()),
               );
             },
-            child: const Text('Chat'),
+            child: const Text('Chat (Fingerprint 1)'),
           ),
           TextButton(
             onPressed: () {
@@ -163,18 +168,11 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
                 MaterialPageRoute(builder: (_) => const TodoHomeScreen()),
               );
             },
-            child: const Text('To-Do'),
+            child: const Text('To-Do (Fingerprint 2)'),
           ),
         ],
       ),
     );
-  }
-
-  void _navigateToEmailLogin() {
-    // Navigator.pushReplacement(
-    //   context,
-    //   MaterialPageRoute(builder: (_) => const EmailLoginScreen()),
-    // );
   }
 
   void _showErrorDialog(String message) {
@@ -265,8 +263,11 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton.icon(
-                          onPressed:
-                          _isAuthenticating ? null : _authenticateWithBiometric,
+                          onPressed: _isAuthenticating
+                              ? null
+                              : _fingerprintsConfigured
+                              ? _authenticateWithBiometric
+                              : null,
                           icon: _isAuthenticating
                               ? const SizedBox(
                             width: 24,
@@ -282,11 +283,23 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
                           label: Text(
                             _isAuthenticating
                                 ? 'Authenticating...'
-                                : 'Use Fingerprint',
+                                : _fingerprintsConfigured
+                                ? 'Use Fingerprint'
+                                : 'Biometric Not Ready',
                             style: const TextStyle(fontSize: 16),
                           ),
                         ),
                       ),
+                      if (_fingerprintsConfigured) ...[
+                        const SizedBox(height: 16),
+                        // Manual selection button (fallback)
+                        OutlinedButton(
+                          onPressed: _isAuthenticating
+                              ? null
+                              : _navigateToManualSelection,
+                          child: const Text('Manual Selection'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -296,22 +309,28 @@ class _BiometricLoginScreenState extends State<BiometricLoginScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    TextButton(
-                      onPressed: _navigateToEmailLogin,
-                      child: Text(
-                        'Login with Email',
+                    if (!_fingerprintsConfigured)
+                      ElevatedButton(
+                        onPressed: () {
+                          // Navigate to setup screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BiometricSetupScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text('Setup Fingerprints'),
+                      )
+                    else
+                      Text(
+                        'Fingerprints configured ✓',
                         style: Theme.of(context)
                             .textTheme
-                            .labelLarge
-                            ?.copyWith(fontSize: 14),
+                            .bodySmall
+                            ?.copyWith(color: const Color(0xFF6366F1)),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'First time? Use email login to set up biometrics',
-                      style: Theme.of(context).textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
                   ],
                 ),
               ),
