@@ -157,7 +157,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => UserChatScreen(
+            builder: (_) => EnhancedUserChatScreen(
               conversationId: conversationId,
               userId: USER_ID,
               userName: USER_NAME,

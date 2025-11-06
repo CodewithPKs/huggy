@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'package:todo/screens/chat/enhanced_chat_screen.dart';
+import 'package:todo/screens/chat/user_chat_screen.dart';
 import 'package:todo/screens/todo/todo_home_screen.dart';
 import 'firebase_options.dart';
 import 'screens/auth/biometric_login_screen.dart';
@@ -11,7 +13,36 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(providers: [
+      ChangeNotifierProvider(
+        create: (_) => TextInputProvider(),
+      ),
+
+      // Chat state (reply, sending, uploads) - Granular updates
+      ChangeNotifierProvider(
+        create: (_) => ChatStateProvider(),
+      ),
+
+      // Messages list - Rebuilds only message list
+      ChangeNotifierProvider(
+        create: (_) => MessagesProvider(),
+      ),
+
+      // Image cache - Rebuilds only image widgets
+      ChangeNotifierProvider(
+        create: (_) => ImageCacheProvider(),
+      ),
+
+      // Video controllers - Rebuilds only video widgets
+      ChangeNotifierProvider(
+        create: (_) => VideoControllerProvider(),
+      ),
+    ], child: const MyApp(),)
+
+      );
+
+
 }
 
 class MyApp extends StatelessWidget {

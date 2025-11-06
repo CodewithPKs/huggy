@@ -1,6 +1,7 @@
 // File: lib/services/advanced_chat_service.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,13 +14,16 @@ class AdvancedChatService {
 
   AdvancedChatService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: 'huggy');
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // Collection paths
   static const String _conversationsPath = 'conversations';
   static const String _messagesPath = 'messages';
   static const String _usersPath = 'users';
+
+  // Fixed conversation ID for single-person app (Praveen <-> Admin chat)
+  static const String PERSONAL_CHAT_ID = 'personal_chat_001';
 
   // Error messages
   static const String errorFailedToSend = 'Failed to send message';
@@ -36,7 +40,8 @@ class AdvancedChatService {
     required String userEmail,
   }) async {
     try {
-      final conversationId = _generateConversationId(userId);
+      // Use fixed conversation ID for single-person app
+      final conversationId = PERSONAL_CHAT_ID;
       final docRef = _firestore.collection(_conversationsPath).doc(conversationId);
       final doc = await docRef.get();
 
@@ -51,8 +56,8 @@ class AdvancedChatService {
           'lastMessageTime': DateTime.now(),
           'lastMessage': '',
           'unreadCount': 0,
-          'adminId': null,
-          'adminName': null,
+          'adminId': 'admin_001',
+          'adminName': 'Admin',
         });
         print('✓ Conversation created: $conversationId');
       }
@@ -78,9 +83,12 @@ class AdvancedChatService {
 
       final messageId = const Uuid().v4();
 
+      // Ensure we're using the personal chat ID
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
       await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(messageId)
           .set({
@@ -97,12 +105,12 @@ class AdvancedChatService {
       });
 
       // Update conversation last message
-      await _firestore.collection(_conversationsPath).doc(conversationId).update({
+      await _firestore.collection(_conversationsPath).doc(chatId).update({
         'lastMessage': messageText,
         'lastMessageTime': DateTime.now(),
       });
 
-      print('✓ Message sent: $messageId');
+      print('✓ Message sent: $messageId in conversation: $chatId');
       return true;
     } catch (e) {
       print('Error sending message: $e');
@@ -126,7 +134,8 @@ class AdvancedChatService {
 
       final file = File(imagePath);
       final uniqueFileName = '${const Uuid().v4()}_$fileName';
-      final uploadPath = 'conversations/$conversationId/images/$uniqueFileName';
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+      final uploadPath = 'conversations/$chatId/images/$uniqueFileName';
 
       // Upload to Firebase Storage with error handling
       final uploadTask = _storage.ref().child(uploadPath).putFile(file);
@@ -143,7 +152,7 @@ class AdvancedChatService {
 
       await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(messageId)
           .set({
@@ -151,27 +160,26 @@ class AdvancedChatService {
         'senderId': userId,
         'senderName': userName,
         'role': role.toString().split('.').last,
+        'message': '[Image]',
         'type': 'image',
         'imageUrl': imageUrl,
         'fileName': fileName,
-        'filePath': uploadPath,
-        'fileSize': file.lengthSync(),
         'timestamp': DateTime.now(),
         'isRead': false,
         'replyTo': null,
-        'reactions': {},
       });
 
-      await _firestore.collection(_conversationsPath).doc(conversationId).update({
+      // Update conversation last message
+      await _firestore.collection(_conversationsPath).doc(chatId).update({
         'lastMessage': '📷 Image',
         'lastMessageTime': DateTime.now(),
       });
 
-      print('✓ Image message sent: $imageUrl');
+      print('✓ Image message sent: $messageId');
       return true;
     } catch (e) {
       print('Error sending image: $e');
-      rethrow;
+      return false;
     }
   }
 
@@ -191,7 +199,8 @@ class AdvancedChatService {
 
       final file = File(docPath);
       final uniqueFileName = '${const Uuid().v4()}_$fileName';
-      final uploadPath = 'conversations/$conversationId/documents/$uniqueFileName';
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+      final uploadPath = 'conversations/$chatId/documents/$uniqueFileName';
 
       final uploadTask = _storage.ref().child(uploadPath).putFile(file);
       final snapshot = await uploadTask;
@@ -201,7 +210,7 @@ class AdvancedChatService {
 
       await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(messageId)
           .set({
@@ -209,27 +218,26 @@ class AdvancedChatService {
         'senderId': userId,
         'senderName': userName,
         'role': role.toString().split('.').last,
+        'message': '[Document]',
         'type': 'document',
-        'documentUrl': docUrl,
+        'docUrl': docUrl,
         'fileName': fileName,
-        'filePath': uploadPath,
-        'fileSize': file.lengthSync(),
         'timestamp': DateTime.now(),
         'isRead': false,
         'replyTo': null,
-        'reactions': {},
       });
 
-      await _firestore.collection(_conversationsPath).doc(conversationId).update({
-        'lastMessage': '📄 $fileName',
+      // Update conversation
+      await _firestore.collection(_conversationsPath).doc(chatId).update({
+        'lastMessage': '📎 Document: $fileName',
         'lastMessageTime': DateTime.now(),
       });
 
-      print('✓ Document message sent');
+      print('✓ Document sent: $messageId');
       return true;
     } catch (e) {
       print('Error sending document: $e');
-      rethrow;
+      return false;
     }
   }
 
@@ -243,28 +251,30 @@ class AdvancedChatService {
     required UserRole role,
   }) async {
     try {
-      if (conversationId.isEmpty || replyToMessageId.isEmpty) {
-        throw Exception('Invalid reply parameters');
+      if (conversationId.isEmpty || userId.isEmpty || messageText.isEmpty) {
+        throw Exception(errorInvalidUser);
       }
 
-      // Verify the original message exists
-      final originalMessage = await _firestore
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
+      // Get the original message being replied to
+      final replyToDoc = await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(replyToMessageId)
           .get();
 
-      if (!originalMessage.exists) {
+      if (!replyToDoc.exists) {
         throw Exception('Original message not found');
       }
 
+      final replyToData = replyToDoc.data();
       final messageId = const Uuid().v4();
-      final replyData = originalMessage.data() as Map<String, dynamic>;
 
       await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(messageId)
           .set({
@@ -278,18 +288,38 @@ class AdvancedChatService {
         'isRead': false,
         'replyTo': {
           'messageId': replyToMessageId,
-          'senderName': replyData['senderName'],
-          'message': replyData['message'] ?? (replyData['type'] == 'image' ? '📷 Image' : '📄 Document'),
+          'message': replyToData?['message'] ?? '',
+          'senderName': replyToData?['senderName'] ?? 'Unknown',
+          'senderId': replyToData?['senderId'] ?? '',
         },
-        'reactions': {},
       });
 
-      print('✓ Reply sent to message: $replyToMessageId');
+      // Update conversation
+      await _firestore.collection(_conversationsPath).doc(chatId).update({
+        'lastMessage': messageText,
+        'lastMessageTime': DateTime.now(),
+      });
+
+      print('✓ Reply sent: $messageId');
       return true;
     } catch (e) {
-      print('Error replying to message: $e');
+      print('Error sending reply: $e');
       return false;
     }
+  }
+
+  /// Get messages stream
+  Stream<QuerySnapshot> getMessagesStream({
+    required String conversationId,
+  }) {
+    final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
+    return _firestore
+        .collection(_conversationsPath)
+        .doc(chatId)
+        .collection(_messagesPath)
+        .orderBy('timestamp', descending: true)
+        .snapshots();
   }
 
   /// Mark message as read
@@ -299,12 +329,14 @@ class AdvancedChatService {
   }) async {
     try {
       if (conversationId.isEmpty || messageId.isEmpty) {
-        throw Exception(errorInvalidUser);
+        return false;
       }
+
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
 
       await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(messageId)
           .update({'isRead': true});
@@ -317,7 +349,7 @@ class AdvancedChatService {
     }
   }
 
-  /// Mark all messages as read for a conversation
+  /// Mark all messages as read
   Future<bool> markAllMessagesAsRead({
     required String conversationId,
   }) async {
@@ -326,18 +358,23 @@ class AdvancedChatService {
         throw Exception(errorConversationNotFound);
       }
 
-      final snapshot = await _firestore
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
+      final unreadMessages = await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .where('isRead', isEqualTo: false)
           .get();
 
-      for (var doc in snapshot.docs) {
-        await doc.reference.update({'isRead': true});
+      final batch = _firestore.batch();
+
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {'isRead': true});
       }
 
-      print('✓ All messages marked as read for conversation: $conversationId');
+      await batch.commit();
+      print('✓ All messages marked as read');
       return true;
     } catch (e) {
       print('Error marking all messages as read: $e');
@@ -345,23 +382,7 @@ class AdvancedChatService {
     }
   }
 
-  /// Get messages stream for a conversation
-  Stream<QuerySnapshot> getMessagesStream({
-    required String conversationId,
-  }) {
-    if (conversationId.isEmpty) {
-      throw Exception(errorConversationNotFound);
-    }
-
-    return _firestore
-        .collection(_conversationsPath)
-        .doc(conversationId)
-        .collection(_messagesPath)
-        .orderBy('timestamp', descending: true)
-        .snapshots();
-  }
-
-  /// Delete a message
+  /// Delete message
   Future<bool> deleteMessage({
     required String conversationId,
     required String messageId,
@@ -371,32 +392,15 @@ class AdvancedChatService {
         throw Exception(errorInvalidUser);
       }
 
-      final messageDoc = await _firestore
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
+      await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(messageId)
-          .get();
+          .delete();
 
-      if (!messageDoc.exists) {
-        throw Exception('Message not found');
-      }
-
-      final data = messageDoc.data() as Map<String, dynamic>;
-      final type = data['type'];
-      final filePath = data['filePath'];
-
-      // Delete from storage if it's a media file
-      if (filePath != null && (type == 'image' || type == 'document')) {
-        try {
-          await _storage.ref().child(filePath).delete();
-        } catch (e) {
-          print('Warning: Could not delete file from storage: $e');
-        }
-      }
-
-      // Delete from Firestore
-      await messageDoc.reference.delete();
       print('✓ Message deleted: $messageId');
       return true;
     } catch (e) {
@@ -405,24 +409,27 @@ class AdvancedChatService {
     }
   }
 
-  /// Edit a message
+  /// Edit message
   Future<bool> editMessage({
     required String conversationId,
     required String messageId,
-    required String newMessage,
+    required String newText,
   }) async {
     try {
-      if (conversationId.isEmpty || messageId.isEmpty) {
+      if (conversationId.isEmpty || messageId.isEmpty || newText.isEmpty) {
         throw Exception(errorInvalidUser);
       }
 
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
       await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .doc(messageId)
           .update({
-        'message': newMessage,
+        'message': newText,
+        'isEdited': true,
         'editedAt': DateTime.now(),
       });
 
@@ -430,35 +437,6 @@ class AdvancedChatService {
       return true;
     } catch (e) {
       print('Error editing message: $e');
-      return false;
-    }
-  }
-
-  /// Add reaction to message
-  Future<bool> addReaction({
-    required String conversationId,
-    required String messageId,
-    required String emoji,
-  }) async {
-    try {
-      if (conversationId.isEmpty || messageId.isEmpty) {
-        throw Exception(errorInvalidUser);
-      }
-
-      final messageRef = _firestore
-          .collection(_conversationsPath)
-          .doc(conversationId)
-          .collection(_messagesPath)
-          .doc(messageId);
-
-      await messageRef.update({
-        'reactions.$emoji': FieldValue.increment(1),
-      });
-
-      print('✓ Reaction added: $emoji');
-      return true;
-    } catch (e) {
-      print('Error adding reaction: $e');
       return false;
     }
   }
@@ -472,9 +450,11 @@ class AdvancedChatService {
         throw Exception(errorConversationNotFound);
       }
 
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
       final snapshot = await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .get();
 
@@ -513,44 +493,17 @@ class AdvancedChatService {
         throw Exception(errorConversationNotFound);
       }
 
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
       await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .update({'status': status});
 
       print('✓ Conversation status updated to: $status');
       return true;
     } catch (e) {
       print('Error updating conversation status: $e');
-      return false;
-    }
-  }
-
-  /// Assign admin to conversation
-  Future<bool> assignAdminToConversation({
-    required String conversationId,
-    required String adminId,
-    required String adminName,
-  }) async {
-    try {
-      if (conversationId.isEmpty || adminId.isEmpty) {
-        throw Exception(errorInvalidUser);
-      }
-
-      await _firestore
-          .collection(_conversationsPath)
-          .doc(conversationId)
-          .update({
-        'adminId': adminId,
-        'adminName': adminName,
-        'status': 'active',
-        'assignedAt': DateTime.now(),
-      });
-
-      print('✓ Admin assigned to conversation: $conversationId');
-      return true;
-    } catch (e) {
-      print('Error assigning admin: $e');
       return false;
     }
   }
@@ -565,9 +518,11 @@ class AdvancedChatService {
         return [];
       }
 
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
       final snapshot = await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .get();
 
@@ -583,11 +538,6 @@ class AdvancedChatService {
     }
   }
 
-  /// Generate conversation ID
-  String _generateConversationId(String userId) {
-    return 'conv_${userId}_${DateTime.now().millisecondsSinceEpoch}';
-  }
-
   /// Get unread count for conversation
   Future<int> getUnreadCount({required String conversationId}) async {
     try {
@@ -595,9 +545,11 @@ class AdvancedChatService {
         throw Exception(errorConversationNotFound);
       }
 
+      final chatId = conversationId.isEmpty ? PERSONAL_CHAT_ID : conversationId;
+
       final snapshot = await _firestore
           .collection(_conversationsPath)
-          .doc(conversationId)
+          .doc(chatId)
           .collection(_messagesPath)
           .where('isRead', isEqualTo: false)
           .count()
