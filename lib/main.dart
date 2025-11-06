@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:todo/provider/call_manager_provider.dart';
 import 'package:todo/screens/chat/enhanced_chat_screen.dart';
 import 'package:todo/screens/chat/user_chat_screen.dart';
 import 'package:todo/screens/todo/todo_home_screen.dart';
@@ -37,6 +38,11 @@ void main() async {
       // Video controllers - Rebuilds only video widgets
       ChangeNotifierProvider(
         create: (_) => VideoControllerProvider(),
+      ),
+
+      ChangeNotifierProvider(
+        create: (_) => CallManagerProvider()
+          ..initialize(userId: 'personal_chat_001'), // Initialize with user ID
       ),
     ], child: const MyApp(),)
 

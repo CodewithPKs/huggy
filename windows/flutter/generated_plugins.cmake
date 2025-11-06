@@ -3,14 +3,15 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  agora_rtc_engine
   cloud_firestore
   emoji_picker_flutter
   file_selector_windows
   firebase_auth
   firebase_core
   firebase_storage
+  iris_method_channel
   local_auth_windows
-  permission_handler_windows
   speech_to_text_windows
 )
 
