@@ -16,7 +16,7 @@ enum CallStatus {
 }
 
 /// User role in the app
-enum UserRole { user, admin }
+enum UserRoles { user, admin }
 
 /// ============================================
 /// VOICE & VIDEO CALL MODEL

@@ -7,6 +7,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:todo/screens/calls/active_voice_call_screen.dart';
+import '../../model/call_models.dart';
+import '../../provider/call_manager_provider.dart';
 import '../../services/advanced_chat_service.dart';
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -15,6 +18,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:provider/provider.dart';
+
+import '../../services/incoming_call_screen.dart';
+import '../calls/ActiveVideoCallScreen.dart';
 
 
 class EnhancedUserChatScreen extends StatefulWidget {
@@ -41,13 +47,128 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: 'huggy');
 
+  late CallManagerProvider _callManager;
+
   @override
   void initState() {
     super.initState();
     _markMessagesAsRead();
     // Initialize providers
     _initializeProviders();
+    _setupCallManager();
   }
+
+  ///Calls
+
+  void _setupCallManager() {
+    _callManager = Provider.of<CallManagerProvider>(context, listen: false);
+
+    // Listen for incoming calls
+    _callManager.listenForIncomingCalls(
+      userId: widget.userId,
+      onIncomingCall: (call) {
+        _showIncomingCallScreen(call);
+      },
+    );
+  }
+
+  void _showIncomingCallScreen(CallModel call) {
+    showDialog(
+      context: context,
+
+
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (context) => IncomingCallScreen(
+        incomingCall: call,
+        onAnswer: () => _acceptCall(context),
+        onReject: () => _rejectCall(context),
+        onTimeout: () => _missedCall(context),
+      ),
+    );
+  }
+
+  void _acceptCall(BuildContext context) {
+    Navigator.pop(context);
+    _callManager.acceptIncomingCall().then((success) {
+      if (success) {
+        _showActiveCallScreen();
+      }
+    });
+  }
+
+  void _rejectCall(BuildContext context) {
+    Navigator.pop(context);
+    _callManager.rejectIncomingCall();
+  }
+
+  void _missedCall(BuildContext context) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Call missed')),
+    );
+  }
+
+  void _showActiveCallScreen() {
+    final call = _callManager.currentCall;
+    if (call == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => call.callType == CallType.voice
+            ? ActiveVoiceCallScreen(
+          callModel: call,
+          onMuteToggle: (_) => _callManager.toggleMute(),
+          onSpeakerToggle: (_) => _callManager.toggleSpeaker(),
+          onEndCall: () => _endCall(),
+          isMuted: _callManager.isMuted,
+          isSpeakerOn: _callManager.isSpeakerOn,
+        )
+            : ActiveVideoCallScreen(
+          callModel: call,
+          agoraService: _callManager.agoraService,
+          remoteUid: _callManager.remoteUid,
+          onMuteToggle: (_) => _callManager.toggleMute(),
+          onCameraToggle: (_) => _callManager.toggleCamera(),
+          onSwitchCamera: () => _callManager.switchCamera(),
+          onEndCall: () => _endCall(),
+          isMuted: _callManager.isMuted,
+          isCameraOn: _callManager.isCameraOn,
+        ),
+      ),
+    );
+  }
+
+  void _endCall() {
+    _callManager.endCall().then((_) {
+      Navigator.pop(context);
+    });
+  }
+
+  Future<void> _initiateVoiceCall() async {
+    final success = await _callManager.initiateVoiceCall(
+      receiverId: 'admin',
+      receiverName: 'Admin',
+    );
+
+    if (success && mounted) {
+      _showActiveCallScreen();
+    }
+  }
+
+  Future<void> _initiateVideoCall() async {
+    final success = await _callManager.initiateVideoCall(
+      receiverId: 'admin',
+      receiverName: 'Admin',
+    );
+
+    if (success && mounted) {
+      _showActiveCallScreen();
+    }
+  }
+
+
+  ///------------------
 
   void _initializeProviders() {
     // Listen to text changes WITHOUT triggering full rebuild
@@ -456,6 +577,15 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
             onPressed: () => _showChatInfo(),
           ),
 
+          IconButton(
+            icon: Icon(Icons.call),
+            onPressed: () => _initiateVoiceCall(),
+          ),
+
+          IconButton(
+            icon: Icon(Icons.videocam),
+            onPressed: () => _initiateVideoCall(),
+          ),
 
           PopupMenuButton<String>(
             onSelected: (String value) {

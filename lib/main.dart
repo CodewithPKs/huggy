@@ -25,6 +25,8 @@ void main() async {
         create: (_) => ChatStateProvider(),
       ),
 
+
+
       // Messages list - Rebuilds only message list
       ChangeNotifierProvider(
         create: (_) => MessagesProvider(),

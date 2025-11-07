@@ -8,12 +8,13 @@ import 'package:permission_handler/permission_handler.dart';
 class AgoraConfig {
   // 🔴 IMPORTANT: Replace with your Agora App ID
   // Get your App ID from: https://console.agora.io
-  static const String appId = 'YOUR_AGORA_APP_ID'; // REPLACE THIS
+  static const String appId = '3a3b5601ce804feca23c1e502cecb3a0'; // REPLACE THIS
 
   // Token will be generated server-side in production
   // For development, you can use a temporary token from Agora Console
-  static const String tempToken = 'YOUR_TEMP_TOKEN'; // REPLACE THIS
+  static const String tempToken = '007eJxTYNiyt+GI+7PQaZwCV952Tpb7lPxL/hj3N+E1Qcu1KvKttPoUGIwTjZNMzQwMk1MtDEzSUpMTjYyTDVNNDYySU5OTjBMNjujwZTYEMjLcNQ1hZWSAQBCfnSEktbgkMy+dgQEA0/kgnw=='; // REPLACE THIS
 }
+
 
 class AgoraCallService {
   static final AgoraCallService _instance = AgoraCallService._internal();
