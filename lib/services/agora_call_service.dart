@@ -11,8 +11,11 @@ class AgoraConfig {
   static const String appId = '3a3b5601ce804feca23c1e502cecb3a0'; // REPLACE THIS
 
   // Token will be generated server-side in production
+
+  static const String fixedChannelName = 'Calling';
+
   // For development, you can use a temporary token from Agora Console
-  static const String tempToken = '007eJxTYNiyt+GI+7PQaZwCV952Tpb7lPxL/hj3N+E1Qcu1KvKttPoUGIwTjZNMzQwMk1MtDEzSUpMTjYyTDVNNDYySU5OTjBMNjujwZTYEMjLcNQ1hZWSAQBCfnSEktbgkMy+dgQEA0/kgnw=='; // REPLACE THIS
+  static const String tempToken = '007eJxTYMhSqWfsz51l1bsjaLq0f6jV8/Bj7Bl7rXo+vZ7adNf5FJcCg3GicZKpmYFhcqqFgUlaanKikXGyYaqpgVFyanKScaLBX3O+zIZARgaBLwHMjAwQCOKzMzgn5uRk5qUzMAAAYCQfvQ=='; // REPLACE THIS
 }
 
 
@@ -146,8 +149,9 @@ class AgoraCallService {
   /// ================================================
 
   /// Join voice call channel
+  /// Join voice call channel
   Future<bool> joinVoiceCall({
-    required String channelId,
+    required String channelId, // This parameter is now ignored
     required int uid,
   }) async {
     try {
@@ -156,7 +160,8 @@ class AgoraCallService {
         return false;
       }
 
-      _currentChannelId = channelId;
+      // 🔴 ALWAYS use fixed channel name
+      _currentChannelId = AgoraConfig.fixedChannelName;
 
       // Set audio profile for voice quality
       await rtcEngine.setAudioProfile(
@@ -164,20 +169,20 @@ class AgoraCallService {
         scenario: AudioScenarioType.audioScenarioDefault,
       );
 
-      // Join channel
+      // Join channel with fixed name
       await rtcEngine.joinChannel(
         token: AgoraConfig.tempToken,
-        channelId: channelId,
+        channelId: AgoraConfig.fixedChannelName, // 🔴 Fixed channel
         uid: uid,
-        options: ChannelMediaOptions(
+        options: const ChannelMediaOptions(
           autoSubscribeAudio: true,
           autoSubscribeVideo: false,
-          // publishAudioTrack: true,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
         ),
       );
 
-
-      print('✓ Joined voice channel: $channelId');
+      print('✓ Joined voice channel: ${AgoraConfig.fixedChannelName}');
       return true;
     } catch (e) {
       print('✗ Error joining voice call: $e');
@@ -186,13 +191,9 @@ class AgoraCallService {
     }
   }
 
-  /// ================================================
-  /// VIDEO CALL
-  /// ================================================
-
   /// Join video call channel
   Future<bool> joinVideoCall({
-    required String channelId,
+    required String channelId, // This parameter is now ignored
     required int uid,
   }) async {
     try {
@@ -201,7 +202,8 @@ class AgoraCallService {
         return false;
       }
 
-      _currentChannelId = channelId;
+      // 🔴 ALWAYS use fixed channel name
+      _currentChannelId = AgoraConfig.fixedChannelName;
 
       // Set video profile for better quality
       await rtcEngine.setVideoEncoderConfiguration(
@@ -219,21 +221,21 @@ class AgoraCallService {
       // Start preview
       await rtcEngine.startPreview();
 
-      // Join channel
+      // Join channel with fixed name
       await rtcEngine.joinChannel(
         token: AgoraConfig.tempToken,
-        channelId: channelId,
+        channelId: AgoraConfig.fixedChannelName, // 🔴 Fixed channel
         uid: uid,
-        options: ChannelMediaOptions(
+        options: const ChannelMediaOptions(
           autoSubscribeAudio: true,
           autoSubscribeVideo: true,
-          // publishAudioTrack: true,
-          publishCameraTrack: true, // or publishVideoTrack depending on SDK version
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          publishCameraTrack: true,
         ),
       );
 
-
-      print('✓ Joined video channel: $channelId');
+      print('✓ Joined video channel: ${AgoraConfig.fixedChannelName}');
       return true;
     } catch (e) {
       print('✗ Error joining video call: $e');
@@ -241,6 +243,103 @@ class AgoraCallService {
       return false;
     }
   }
+
+
+  // Future<bool> joinVoiceCall({
+  //   required String channelId,
+  //   required int uid,
+  // }) async {
+  //   try {
+  //     if (!_isInitialized) {
+  //       print('✗ Agora not initialized');
+  //       return false;
+  //     }
+  //
+  //     _currentChannelId = channelId;
+  //
+  //     // Set audio profile for voice quality
+  //     await rtcEngine.setAudioProfile(
+  //       profile: AudioProfileType.audioProfileDefault,
+  //       scenario: AudioScenarioType.audioScenarioDefault,
+  //     );
+  //
+  //     // Join channel
+  //     await rtcEngine.joinChannel(
+  //       token: AgoraConfig.tempToken,
+  //       channelId: channelId,
+  //       uid: uid,
+  //       options: ChannelMediaOptions(
+  //         autoSubscribeAudio: true,
+  //         autoSubscribeVideo: false,
+  //         // publishAudioTrack: true,
+  //       ),
+  //     );
+  //
+  //
+  //     print('✓ Joined voice channel: $channelId');
+  //     return true;
+  //   } catch (e) {
+  //     print('✗ Error joining voice call: $e');
+  //     _notifyError('Failed to join voice call: $e');
+  //     return false;
+  //   }
+  // }
+
+  /// ================================================
+  /// VIDEO CALL
+  /// ================================================
+
+  /// Join video call channel
+  // Future<bool> joinVideoCall({
+  //   required String channelId,
+  //   required int uid,
+  // }) async {
+  //   try {
+  //     if (!_isInitialized) {
+  //       print('✗ Agora not initialized');
+  //       return false;
+  //     }
+  //
+  //     _currentChannelId = channelId;
+  //
+  //     // Set video profile for better quality
+  //     await rtcEngine.setVideoEncoderConfiguration(
+  //       const VideoEncoderConfiguration(
+  //         dimensions: VideoDimensions(width: 720, height: 1280),
+  //         frameRate: 30,
+  //         bitrate: 2500,
+  //         orientationMode: OrientationMode.orientationModeAdaptive,
+  //       ),
+  //     );
+  //
+  //     // Enable video
+  //     await rtcEngine.enableVideo();
+  //
+  //     // Start preview
+  //     await rtcEngine.startPreview();
+  //
+  //     // Join channel
+  //     await rtcEngine.joinChannel(
+  //       token: AgoraConfig.tempToken,
+  //       channelId: channelId,
+  //       uid: uid,
+  //       options: ChannelMediaOptions(
+  //         autoSubscribeAudio: true,
+  //         autoSubscribeVideo: true,
+  //         // publishAudioTrack: true,
+  //         publishCameraTrack: true, // or publishVideoTrack depending on SDK version
+  //       ),
+  //     );
+  //
+  //
+  //     print('✓ Joined video channel: $channelId');
+  //     return true;
+  //   } catch (e) {
+  //     print('✗ Error joining video call: $e');
+  //     _notifyError('Failed to join video call: $e');
+  //     return false;
+  //   }
+  // }
 
   /// Switch camera (front/back)
   Future<void> switchCamera() async {

@@ -99,6 +99,61 @@ class CallManagerProvider extends ChangeNotifier {
   /// ================================================
 
   /// Initiate a voice call
+  // Future<bool> initiateVoiceCall({
+  //   required String receiverId,
+  //   required String receiverName,
+  // }) async {
+  //   try {
+  //     _errorMessage = null;
+  //
+  //     // Create call in Firebase
+  //     final callId = await _signaling.initiateCall(
+  //       callerId: _currentUserId,
+  //       callerName: 'Me',
+  //       receiverId: receiverId,
+  //       receiverName: receiverName,
+  //       callType: CallType.voice,
+  //       userRole: _currentUserId,
+  //     );
+  //
+  //     if (callId == null) {
+  //       throw Exception('Failed to create call');
+  //     }
+  //
+  //     // Create call model
+  //     _currentCall = CallModel(
+  //       callId: callId,
+  //       callerId: _currentUserId,
+  //       callerName: 'Me',
+  //       receiverId: receiverId,
+  //       receiverName: receiverName,
+  //       callType: CallType.voice,
+  //       status: CallStatus.pending,
+  //       createdAt: DateTime.now(),
+  //       agoraChannelId: 'Calling',
+  //     );
+  //
+  //     // Join Agora channel
+  //     final joined = await _agoraService.joinVoiceCall(
+  //       channelId: 'Calling',
+  //       uid: _generateUid(),
+  //     );
+  //
+  //     if (!joined) {
+  //       throw Exception('Failed to join voice channel');
+  //     }
+  //
+  //     _currentCallStatus = CallStatus.pending;
+  //     print('✓ Voice call initiated: $callId');
+  //     notifyListeners();
+  //     return true;
+  //   } catch (e) {
+  //     _errorMessage = 'Failed to initiate call: $e';
+  //     print('✗ $_errorMessage');
+  //     notifyListeners();
+  //     return false;
+  //   }
+  // }
   Future<bool> initiateVoiceCall({
     required String receiverId,
     required String receiverName,
@@ -120,7 +175,7 @@ class CallManagerProvider extends ChangeNotifier {
         throw Exception('Failed to create call');
       }
 
-      // Create call model
+      // Create call model - 🔴 Use fixed channel name
       _currentCall = CallModel(
         callId: callId,
         callerId: _currentUserId,
@@ -130,12 +185,12 @@ class CallManagerProvider extends ChangeNotifier {
         callType: CallType.voice,
         status: CallStatus.pending,
         createdAt: DateTime.now(),
-        agoraChannelId: 'call_$callId',
+        agoraChannelId: AgoraConfig.fixedChannelName, // 🔴 Changed
       );
 
-      // Join Agora channel
+      // Join Agora channel - 🔴 Pass fixed channel (though it's ignored now)
       final joined = await _agoraService.joinVoiceCall(
-        channelId: 'call_$callId',
+        channelId: AgoraConfig.fixedChannelName,
         uid: _generateUid(),
       );
 
@@ -177,7 +232,7 @@ class CallManagerProvider extends ChangeNotifier {
         throw Exception('Failed to create call');
       }
 
-      // Create call model
+      // Create call model - 🔴 Use fixed channel name
       _currentCall = CallModel(
         callId: callId,
         callerId: _currentUserId,
@@ -187,12 +242,12 @@ class CallManagerProvider extends ChangeNotifier {
         callType: CallType.video,
         status: CallStatus.pending,
         createdAt: DateTime.now(),
-        agoraChannelId: 'call_$callId',
+        agoraChannelId: AgoraConfig.fixedChannelName, // 🔴 Changed
       );
 
       // Join Agora channel
       final joined = await _agoraService.joinVideoCall(
-        channelId: 'call_$callId',
+        channelId: AgoraConfig.fixedChannelName,
         uid: _generateUid(),
       );
 
@@ -212,6 +267,65 @@ class CallManagerProvider extends ChangeNotifier {
       return false;
     }
   }
+
+
+  /// Initiate a video call
+  // Future<bool> initiateVideoCall({
+  //   required String receiverId,
+  //   required String receiverName,
+  // }) async {
+  //   try {
+  //     _errorMessage = null;
+  //
+  //     // Create call in Firebase
+  //     final callId = await _signaling.initiateCall(
+  //       callerId: _currentUserId,
+  //       callerName: 'Me',
+  //       receiverId: receiverId,
+  //       receiverName: receiverName,
+  //       callType: CallType.video,
+  //       userRole: _currentUserId,
+  //     );
+  //
+  //     if (callId == null) {
+  //       throw Exception('Failed to create call');
+  //     }
+  //
+  //     // Create call model
+  //     _currentCall = CallModel(
+  //       callId: callId,
+  //       callerId: _currentUserId,
+  //       callerName: 'Me',
+  //       receiverId: receiverId,
+  //       receiverName: receiverName,
+  //       callType: CallType.video,
+  //       status: CallStatus.pending,
+  //       createdAt: DateTime.now(),
+  //       agoraChannelId: 'call_$callId',
+  //     );
+  //
+  //     // Join Agora channel
+  //     final joined = await _agoraService.joinVideoCall(
+  //       channelId: 'call_$callId',
+  //       uid: _generateUid(),
+  //     );
+  //
+  //     if (!joined) {
+  //       throw Exception('Failed to join video channel');
+  //     }
+  //
+  //     _currentCallStatus = CallStatus.pending;
+  //     _isCameraOn = true;
+  //     print('✓ Video call initiated: $callId');
+  //     notifyListeners();
+  //     return true;
+  //   } catch (e) {
+  //     _errorMessage = 'Failed to initiate call: $e';
+  //     print('✗ $_errorMessage');
+  //     notifyListeners();
+  //     return false;
+  //   }
+  // }
 
   /// ================================================
   /// ACCEPTING & REJECTING CALLS

@@ -1,5 +1,6 @@
 // File: lib/services/firebase_call_signaling_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:uuid/uuid.dart';
 import '../model/call_models.dart';
 
@@ -14,7 +15,7 @@ class FirebaseCallSignalingService {
 
   FirebaseCallSignalingService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(app : Firebase.app(), databaseId: 'huggy');
 
   // Collection paths
   static const String _callsCollection = 'calls';
