@@ -4,7 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:provider/provider.dart';
+import '../../model/call_models.dart';
+import '../../provider/call_manager_provider.dart';
 import '../../services/advanced_chat_service.dart';
+import '../../services/incoming_call_screen.dart';
+import '../calls/ActiveVideoCallScreen.dart';
+import '../calls/active_voice_call_screen.dart';
 
 class AdminChatScreen extends StatefulWidget {
   const AdminChatScreen({Key? key}) : super(key: key);
@@ -24,10 +30,110 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   static const String USER_NAME = 'User';
   static const String USER_EMAIL = 'user@example.com';
 
+  late CallManagerProvider _callManager;
+
   @override
   void initState() {
     super.initState();
     _initializeAndLoadConversation();
+    _setupCallManager();
+  }
+
+  void _setupCallManager() {
+    _callManager = Provider.of<CallManagerProvider>(context, listen: false);
+
+    // Initialize call manager with admin user ID
+    _callManager.initialize(userId: 'admin').then((_) {
+      print('✓ Admin call manager initialized');
+
+      // Listen for incoming calls
+      _callManager.listenForIncomingCalls(
+        userId: 'admin',
+        onIncomingCall: (call) {
+          print('📞 ADMIN: Incoming call from ${call.callerName}');
+          _showIncomingCallScreen(call);
+        },
+      );
+
+      print('✓ Admin listening for incoming calls');
+    });
+  }
+
+  // 🔴 ADD THIS METHOD
+  void _showIncomingCallScreen(CallModel call) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (context) => IncomingCallScreen(
+        incomingCall: call,
+        onAnswer: () => _acceptCall(context),
+        onReject: () => _rejectCall(context),
+        onTimeout: () => _missedCall(context),
+      ),
+    );
+  }
+
+  // 🔴 ADD THIS METHOD
+  void _acceptCall(BuildContext context) {
+    Navigator.pop(context);
+    _callManager.acceptIncomingCall().then((success) {
+      if (success) {
+        _showActiveCallScreen();
+      }
+    });
+  }
+
+  // 🔴 ADD THIS METHOD
+  void _rejectCall(BuildContext context) {
+    Navigator.pop(context);
+    _callManager.rejectIncomingCall();
+  }
+
+  // 🔴 ADD THIS METHOD
+  void _missedCall(BuildContext context) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Call missed')),
+    );
+  }
+
+  // 🔴 ADD THIS METHOD
+  void _showActiveCallScreen() {
+    final call = _callManager.currentCall;
+    if (call == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => call.callType == CallType.voice
+            ? ActiveVoiceCallScreen(
+          callModel: call,
+          onMuteToggle: (_) => _callManager.toggleMute(),
+          onSpeakerToggle: (_) => _callManager.toggleSpeaker(),
+          onEndCall: () => _endCall(),
+          isMuted: _callManager.isMuted,
+          isSpeakerOn: _callManager.isSpeakerOn,
+        )
+            : ActiveVideoCallScreen(
+          callModel: call,
+          agoraService: _callManager.agoraService,
+          remoteUid: _callManager.remoteUid,
+          onMuteToggle: (_) => _callManager.toggleMute(),
+          onCameraToggle: (_) => _callManager.toggleCamera(),
+          onSwitchCamera: () => _callManager.switchCamera(),
+          onEndCall: () => _endCall(),
+          isMuted: _callManager.isMuted,
+          isCameraOn: _callManager.isCameraOn,
+        ),
+      ),
+    );
+  }
+
+  // 🔴 ADD THIS METHOD
+  void _endCall() {
+    _callManager.endCall().then((_) {
+      Navigator.pop(context);
+    });
   }
 
   Future<void> _initializeAndLoadConversation() async {

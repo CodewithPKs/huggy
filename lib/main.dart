@@ -46,6 +46,11 @@ void main() async {
         create: (_) => CallManagerProvider()
           ..initialize(userId: 'personal_chat_001'), // Initialize with user ID
       ),
+
+      // ChangeNotifierProvider(
+      //   create: (_) => CallManagerProvider()
+      //     ..initialize(userId: 'admin'), // Initialize with user ID
+      // ),
     ], child: const MyApp(),)
 
       );

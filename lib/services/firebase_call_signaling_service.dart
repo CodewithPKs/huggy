@@ -33,38 +33,43 @@ class FirebaseCallSignalingService {
     required String receiverId,
     required String receiverName,
     required CallType callType,
-    required String userRole, // 'user' or 'admin'
+    required String userRole,
   }) async {
     try {
       final callId = const Uuid().v4();
-      final agoraChannelId = 'call_$callId'; // Agora channel name
+      final agoraChannelId = 'Calling'; // 🔴 Use fixed channel name
 
-      final callData = CallModel(
-        callId: callId,
-        callerId: callerId,
-        callerName: callerName,
-        receiverId: receiverId,
-        receiverName: receiverName,
-        callType: callType,
-        status: CallStatus.pending,
-        createdAt: DateTime.now(),
-        agoraChannelId: agoraChannelId,
-        callInitiatorRole: userRole,
-      );
+      // 🔴 Create call data with "ringing" status
+      final callData = {
+        'callId': callId,
+        'callerId': callerId,
+        'callerName': callerName,
+        'receiverId': receiverId,
+        'receiverName': receiverName,
+        'callType': callType == CallType.voice ? 'voice' : 'video',
+        'status': 'ringing', // 🔴 IMPORTANT: Changed from "pending" to "ringing"
+        'agoraChannelId': agoraChannelId,
+        'createdAt': DateTime.now().toIso8601String(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'callInitiatorRole': userRole,
+        'durationSeconds': 0,
+        'startedAt': null,
+        'endedAt': null,
+      };
 
-      // Save call to Firestore with real-time updates enabled
-      await _firestore.collection(_callsCollection).doc(callId).set(
-        callData.toFirestore(),
-      );
+      // Save call to Firestore
+      await _firestore.collection(_callsCollection).doc(callId).set(callData);
 
       print('✓ Call initiated: $callId');
+      print('✓ Caller: $callerId → Receiver: $receiverId');
+      print('✓ Status: ringing');
+
       return callId;
     } catch (e) {
       print('✗ Error initiating call: $e');
       return null;
     }
   }
-
   /// Accept incoming call
   Future<bool> acceptCall(String callId) async {
     try {
@@ -162,18 +167,54 @@ class FirebaseCallSignalingService {
   /// ================================================
 
   /// Listen for incoming calls for a specific user
+  // Stream<List<CallModel>> getIncomingCallsStream(String userId) {
+  //   return _firestore
+  //       .collection(_callsCollection)
+  //       .where('receiverId', isEqualTo: userId)
+  //       .where('status', isEqualTo: 'pending')
+  //       .snapshots()
+  //       .map((snapshot) {
+  //     return snapshot.docs
+  //         .map((doc) => CallModel.fromFirestore(
+  //       doc.data() as Map<String, dynamic>,
+  //     ))
+  //         .toList();
+  //   });
+  // }
+
   Stream<List<CallModel>> getIncomingCallsStream(String userId) {
+    print('👂 [FIREBASE] Listening for calls where receiverId == $userId');
+
     return _firestore
-        .collection(_callsCollection)
+        .collection('calls')
         .where('receiverId', isEqualTo: userId)
-        .where('status', isEqualTo: 'pending')
+        .where('status', whereIn: ['ringing', 'pending'])// 🔴 Changed from 'ringing' to 'pending'
+        .orderBy('timestamp', descending: true)
+        .limit(1)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => CallModel.fromFirestore(
-        doc.data() as Map<String, dynamic>,
-      ))
-          .toList();
+      print('📞 [FIREBASE] Found ${snapshot.docs.length} incoming calls');
+
+      if (snapshot.docs.isNotEmpty) {
+        for (var doc in snapshot.docs) {
+          print('📞 [FIREBASE] Call data: ${doc.data()}');
+        }
+      }
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return CallModel(
+          callId: data['callId'] ?? '',
+          callerId: data['callerId'] ?? '',
+          callerName: data['callerName'] ?? 'Unknown',
+          receiverId: data['receiverId'] ?? '',
+          receiverName: data['receiverName'] ?? 'Unknown',
+          callType: data['callType'] == 'voice' ? CallType.voice : CallType.video,
+          status: CallStatus.pending,
+          createdAt: DateTime.parse(data['createdAt'] ?? DateTime.now().toIso8601String()),
+          agoraChannelId: data['agoraChannelId'] ?? 'Calling',
+        );
+      }).toList();
     });
   }
 
