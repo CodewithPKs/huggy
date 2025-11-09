@@ -5,15 +5,22 @@ import 'package:todo/provider/call_manager_provider.dart';
 import 'package:todo/screens/chat/enhanced_chat_screen.dart';
 import 'package:todo/screens/chat/user_chat_screen.dart';
 import 'package:todo/screens/todo/todo_home_screen.dart';
+import 'package:todo/services/token_manager.dart';
 import 'firebase_options.dart';
 import 'screens/auth/biometric_login_screen.dart';
 import 'theme/dark_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+
+  const String myUid = '3a3b5601ce804feca23c1e502cecb3a0';
+  await TokenManager.refreshTokenAndSave(myUid);
+
   runApp(
     MultiProvider(providers: [
       ChangeNotifierProvider(

@@ -8,14 +8,12 @@ import 'package:permission_handler/permission_handler.dart';
 class AgoraConfig {
   // 🔴 IMPORTANT: Replace with your Agora App ID
   // Get your App ID from: https://console.agora.io
-  static const String appId = '3a3b5601ce804feca23c1e502cecb3a0'; // REPLACE THIS
-
-  // Token will be generated server-side in production
+  static const String appId = '3a3b5601ce804feca23c1e502cecb3a0';
 
   static const String fixedChannelName = 'Calling';
 
-  // For development, you can use a temporary token from Agora Console
-  static const String tempToken = '007eJxTYMhSqWfsz51l1bsjaLq0f6jV8/Bj7Bl7rXo+vZ7adNf5FJcCg3GicZKpmYFhcqqFgUlaanKikXGyYaqpgVFyanKScaLBX3O+zIZARgaBLwHMjAwQCOKzMzgn5uRk5qUzMAAAYCQfvQ=='; // REPLACE THIS
+  static String tempToken = '';
+// static const String tempToken = '0063a3b5601ce804feca23c1e502cecb3a0IACAkvbBSCLwKjUbrO2RN+tPhGs/KRAtEsDg57iTq/N4Se/8u2kPia3oIgA5CHohlDASaQQAAQCUMBJpAgCUMBJpAwCUMBJpBACUMBJp'; // REPLACE THIS
 }
 
 
@@ -224,7 +222,7 @@ class AgoraCallService {
       // Join channel with fixed name
       await rtcEngine.joinChannel(
         token: AgoraConfig.tempToken,
-        channelId: AgoraConfig.fixedChannelName, // 🔴 Fixed channel
+        channelId: AgoraConfig.fixedChannelName,
         uid: uid,
         options: const ChannelMediaOptions(
           autoSubscribeAudio: true,

@@ -22,7 +22,6 @@ import 'package:provider/provider.dart';
 import '../../services/incoming_call_screen.dart';
 import '../calls/ActiveVideoCallScreen.dart';
 
-
 class EnhancedUserChatScreen extends StatefulWidget {
   final String conversationId;
   final String userId;

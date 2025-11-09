@@ -1,23 +1,56 @@
-# Firebase
+##############################
+# 🧱 Firebase and JSON
+##############################
 -keepattributes Signature
 -keepattributes *Annotation*
 
-# JSON serialization
 -keepclassmembers class * {
   @com.google.gson.annotations.SerializedName <fields>;
 }
 
-# Preserve custom classes
+##############################
+# 🧱 Custom app classes
+##############################
 -keep class com.example.dual_access_app.** { *; }
 
-# Keep native methods
+##############################
+# 🧱 Native / JNI methods
+##############################
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# Keep Flutter classes
+##############################
+# 🧱 Flutter Engine and Plugins
+##############################
 -keep class io.flutter.** { *; }
+-keep class io.flutter.plugins.** { *; }
+-keep class io.flutter.embedding.** { *; }
+-keep class io.flutter.view.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class io.flutter.app.** { *; }
+
+##############################
+# 🧱 Firebase / Google Services
+##############################
 -keep class com.google.firebase.** { *; }
-# Keep Flutter and Play Core classes if R8 is shrinking them accidentally
--keep class io.flutter.embedding.engine.deferredcomponents.** { *; }
+-keep class com.google.android.gms.** { *; }
+
+##############################
+# 🧱 Play Core / SplitCompat
+##############################
+# Keep all Play Core classes but avoid SplitInstall duplicates
 -keep class com.google.android.play.core.** { *; }
+-keep class com.google.android.play.core.common.** { *; }
+-keep class com.google.android.play.core.splitcompat.** { *; }
+-keep class com.google.android.play.core.splitinstall.** { *; }
+-keep class com.google.android.play.core.tasks.** { *; }
+
+
+##############################
+# 🧱 Application / Entry points
+##############################
+-keep class * extends android.app.Application
+-keepclassmembers class * {
+    public <init>(android.content.Context);
+}
