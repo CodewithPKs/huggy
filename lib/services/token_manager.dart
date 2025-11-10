@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
-import 'package:cloud_firestore/cloud_firestore.dart'; // or firebase_database if using Realtime DB
-import 'agora_call_service.dart'; // where AgoraConfig is
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'agora_call_service.dart';
 
 class TokenManager {
   static const String _tokenServerUrl = 'https://jiifto.onrender.com/rtc';
@@ -10,6 +10,7 @@ class TokenManager {
 
   /// Fetch token from your backend
   static Future<String> fetchNewToken(String uid) async {
+
     final url = Uri.parse('$_tokenServerUrl/${AgoraConfig.fixedChannelName}/$uid');
     final response = await http.get(url);
 

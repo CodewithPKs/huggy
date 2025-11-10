@@ -46,6 +46,8 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: 'huggy');
 
+  final FocusNode _messageFocusNode = FocusNode();
+
   late CallManagerProvider _callManager;
 
   @override
@@ -181,6 +183,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
     _messageController.removeListener(() {});
     _messageController.dispose();
     _scrollController.dispose();
+    _messageFocusNode.dispose();
     context.read<VideoControllerProvider>().disposeAll();
     super.dispose();
   }
@@ -195,7 +198,6 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
     }
   }
 
-  // Enhanced send message with Provider state management
   Future<void> _sendMessage() async {
     final textProvider = context.read<TextInputProvider>();
     final chatStateProvider = context.read<ChatStateProvider>();
@@ -203,10 +205,16 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
     if (textProvider.text.trim().isEmpty) return;
 
     final message = textProvider.text.trim();
+
+    // ✅ CRITICAL: Clear text WHILE keeping focus
+    // Store cursor position to maintain focus properly
+    final currentFocus = _messageFocusNode.hasFocus;
+
     textProvider.clear();
     _messageController.clear();
 
-    chatStateProvider.setSending(true);
+    // ✅ DON'T set isSending here - it causes UI rebuild
+    // chatStateProvider.setSending(true); // REMOVE THIS
 
     try {
       bool success;
@@ -232,6 +240,12 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
 
       if (success && mounted) {
         chatStateProvider.clearReply();
+
+        // ✅ ONLY request focus if it was focused before
+        if (currentFocus) {
+          _messageFocusNode.requestFocus();
+        }
+
         _scrollToBottom();
       } else if (mounted) {
         _showErrorSnackBar('Failed to send message');
@@ -240,11 +254,8 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
       if (mounted) {
         _showErrorSnackBar('Error: ${e.toString()}');
       }
-    } finally {
-      if (mounted) {
-        chatStateProvider.setSending(false);
-      }
     }
+    // ✅ REMOVED finally block - no need to setSending(false)
   }
 
   // Image picking with Provider
@@ -667,43 +678,48 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                       );
                     }
 
-                    return ListView.builder(
-                      reverse: true,
-                      controller: _scrollController,
-                      itemCount: allMessages.length,
-                      itemBuilder: (context, index) {
-                        final current = allMessages[index];
-
-                        // Check if this is a pending message
-                        if (current is PendingMessage) {
-                          return _buildPendingMessageBubble(current);
-                        }
-
-                        // Regular message
-                        final message = current as DocumentSnapshot;
-                        final messageData = message.data() as Map<String, dynamic>;
-                        final currentTimestamp = (messageData['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
-
-                        // Check if we need to show date separator
-                        DateTime? previousTimestamp;
-                        if (index < allMessages.length - 1 && allMessages[index + 1] is DocumentSnapshot) {
-                          final prevMessage = allMessages[index + 1] as DocumentSnapshot;
-                          final prevData = prevMessage.data() as Map<String, dynamic>;
-                          previousTimestamp = (prevData['timestamp'] as Timestamp?)?.toDate();
-                        }
-
-                        final showDateSeparator = _shouldShowDateSeparator(
-                          currentTimestamp,
-                          previousTimestamp,
-                        );
-
-                        return Column(
-                          children: [
-                            if (showDateSeparator) _buildDateSeparator(currentTimestamp),
-                            _buildMessageBubble(message),
-                          ],
-                        );
+                    return GestureDetector(
+                      onTap: () {
+                        FocusScope.of(context).unfocus();
                       },
+                      child: ListView.builder(
+                        reverse: true,
+                        controller: _scrollController,
+                        itemCount: allMessages.length,
+                        itemBuilder: (context, index) {
+                          final current = allMessages[index];
+
+                          // Check if this is a pending message
+                          if (current is PendingMessage) {
+                            return _buildPendingMessageBubble(current);
+                          }
+
+                          // Regular message
+                          final message = current as DocumentSnapshot;
+                          final messageData = message.data() as Map<String, dynamic>;
+                          final currentTimestamp = (messageData['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+
+                          // Check if we need to show date separator
+                          DateTime? previousTimestamp;
+                          if (index < allMessages.length - 1 && allMessages[index + 1] is DocumentSnapshot) {
+                            final prevMessage = allMessages[index + 1] as DocumentSnapshot;
+                            final prevData = prevMessage.data() as Map<String, dynamic>;
+                            previousTimestamp = (prevData['timestamp'] as Timestamp?)?.toDate();
+                          }
+
+                          final showDateSeparator = _shouldShowDateSeparator(
+                            currentTimestamp,
+                            previousTimestamp,
+                          );
+
+                          return Column(
+                            children: [
+                              if (showDateSeparator) _buildDateSeparator(currentTimestamp),
+                              _buildMessageBubble(message),
+                            ],
+                          );
+                        },
+                      ),
                     );
                   },
                 );
@@ -1239,11 +1255,162 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
     );
   }
 
+  // Widget _buildMessageInput() {
+  //   return Consumer2<TextInputProvider, ChatStateProvider>(
+  //     builder: (context, textInputProvider, chatStateProvider, _) {
+  //       final hasText = textInputProvider.hasText;
+  //       final isSending = chatStateProvider.isSending;
+  //
+  //       return Container(
+  //         decoration: BoxDecoration(
+  //           color: const Color(0xFF1E1E1E),
+  //           boxShadow: [
+  //             BoxShadow(
+  //               color: Colors.black26,
+  //               blurRadius: 4,
+  //               offset: const Offset(0, -2),
+  //             ),
+  //           ],
+  //         ),
+  //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  //         child: SafeArea(
+  //           child: Row(
+  //             crossAxisAlignment: CrossAxisAlignment.end,
+  //             children: [
+  //               // Attachment button
+  //               PopupMenuButton(
+  //                 icon: Icon(
+  //                   Icons.attachment,
+  //                   color: isSending ? Colors.white38 : Colors.white70,
+  //                 ),
+  //                 enabled: !isSending,
+  //                 itemBuilder: (context) => [
+  //                   PopupMenuItem(
+  //                     child: const Row(
+  //                       children: [
+  //                         Icon(Icons.camera_alt),
+  //                         SizedBox(width: 12),
+  //                         Text('Camera'),
+  //                       ],
+  //                     ),
+  //                     onTap: isSending ? null : _pickAndSendCamera,
+  //                   ),
+  //                   PopupMenuItem(
+  //                     child: const Row(
+  //                       children: [
+  //                         Icon(Icons.image),
+  //                         SizedBox(width: 12),
+  //                         Text('Gallery'),
+  //                       ],
+  //                     ),
+  //                     onTap: isSending ? null : _pickAndSendImage,
+  //                   ),
+  //                   PopupMenuItem(
+  //                     child: const Row(
+  //                       children: [
+  //                         Icon(Icons.videocam),
+  //                         SizedBox(width: 12),
+  //                         Text('Video'),
+  //                       ],
+  //                     ),
+  //                     onTap: isSending ? null : _pickAndSendVideo,
+  //                   ),
+  //                   PopupMenuItem(
+  //                     child: const Row(
+  //                       children: [
+  //                         Icon(Icons.description),
+  //                         SizedBox(width: 12),
+  //                         Text('Document'),
+  //                       ],
+  //                     ),
+  //                     onTap: isSending ? null : _pickAndSendDocument,
+  //                   ),
+  //                 ],
+  //               ),
+  //               // Message text field
+  //               Expanded(
+  //                 child: Container(
+  //                   constraints: const BoxConstraints(maxHeight: 120),
+  //                   child: TextField(
+  //                     controller: _messageController,
+  //                     decoration: InputDecoration(
+  //                       hintText: 'Type your message...',
+  //                       hintStyle: const TextStyle(color: Colors.white38),
+  //                       border: OutlineInputBorder(
+  //                         borderRadius: BorderRadius.circular(24),
+  //                         borderSide: const BorderSide(color: Color(0xFF404040)),
+  //                       ),
+  //                       enabledBorder: OutlineInputBorder(
+  //                         borderRadius: BorderRadius.circular(24),
+  //                         borderSide: const BorderSide(color: Color(0xFF404040)),
+  //                       ),
+  //                       focusedBorder: OutlineInputBorder(
+  //                         borderRadius: BorderRadius.circular(24),
+  //                         borderSide: const BorderSide(
+  //                           color: Color(0xFF6366F1),
+  //                           width: 2,
+  //                         ),
+  //                       ),
+  //                       contentPadding: const EdgeInsets.symmetric(
+  //                         horizontal: 16,
+  //                         vertical: 12,
+  //                       ),
+  //                       filled: true,
+  //                       fillColor: const Color(0xFF2A2A2A),
+  //                     ),
+  //                     style: const TextStyle(color: Colors.white),
+  //                     maxLines: null,
+  //                     keyboardType: TextInputType.multiline,
+  //                     textInputAction: TextInputAction.newline,
+  //                     enabled: !isSending,
+  //                   ),
+  //                 ),
+  //               ),
+  //               const SizedBox(width: 8),
+  //               // Send button
+  //               Material(
+  //                 color: hasText && !isSending
+  //                     ? const Color(0xFF6366F1)
+  //                     : const Color(0xFF404040),
+  //                 borderRadius: BorderRadius.circular(24),
+  //                 child: InkWell(
+  //                   onTap: hasText && !isSending ? _sendMessage : null,
+  //                   borderRadius: BorderRadius.circular(24),
+  //                   child: Container(
+  //                     width: 48,
+  //                     height: 48,
+  //                     alignment: Alignment.center,
+  //                     child: isSending
+  //                         ? const SizedBox(
+  //                       width: 20,
+  //                       height: 20,
+  //                       child: CircularProgressIndicator(
+  //                         strokeWidth: 2,
+  //                         valueColor: AlwaysStoppedAnimation(Colors.white54),
+  //                       ),
+  //                     )
+  //                         : Icon(
+  //                       Icons.send,
+  //                       color: hasText ? Colors.white : Colors.white38,
+  //                       size: 22,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
+
+
   Widget _buildMessageInput() {
     return Consumer2<TextInputProvider, ChatStateProvider>(
       builder: (context, textInputProvider, chatStateProvider, _) {
         final hasText = textInputProvider.hasText;
-        final isSending = chatStateProvider.isSending;
+        // final isSending = chatStateProvider.isSending;
 
         return Container(
           decoration: BoxDecoration(
@@ -1265,9 +1432,9 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                 PopupMenuButton(
                   icon: Icon(
                     Icons.attachment,
-                    color: isSending ? Colors.white38 : Colors.white70,
+                    color: Colors.white70,
                   ),
-                  enabled: !isSending,
+                  // enabled: !isSending,
                   itemBuilder: (context) => [
                     PopupMenuItem(
                       child: const Row(
@@ -1277,7 +1444,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                           Text('Camera'),
                         ],
                       ),
-                      onTap: isSending ? null : _pickAndSendCamera,
+                      onTap:_pickAndSendCamera,
                     ),
                     PopupMenuItem(
                       child: const Row(
@@ -1287,7 +1454,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                           Text('Gallery'),
                         ],
                       ),
-                      onTap: isSending ? null : _pickAndSendImage,
+                      onTap: _pickAndSendImage,
                     ),
                     PopupMenuItem(
                       child: const Row(
@@ -1297,7 +1464,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                           Text('Video'),
                         ],
                       ),
-                      onTap: isSending ? null : _pickAndSendVideo,
+                      onTap:  _pickAndSendVideo,
                     ),
                     PopupMenuItem(
                       child: const Row(
@@ -1307,7 +1474,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                           Text('Document'),
                         ],
                       ),
-                      onTap: isSending ? null : _pickAndSendDocument,
+                      onTap: _pickAndSendDocument,
                     ),
                   ],
                 ),
@@ -1317,6 +1484,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                     constraints: const BoxConstraints(maxHeight: 120),
                     child: TextField(
                       controller: _messageController,
+                      focusNode: _messageFocusNode,
                       decoration: InputDecoration(
                         hintText: 'Type your message...',
                         hintStyle: const TextStyle(color: Colors.white38),
@@ -1346,34 +1514,27 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                       maxLines: null,
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.newline,
-                      enabled: !isSending,
+                      // enabled: !isSending,
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 // Send button
                 Material(
-                  color: hasText && !isSending
+                  color: hasText
                       ? const Color(0xFF6366F1)
                       : const Color(0xFF404040),
                   borderRadius: BorderRadius.circular(24),
                   child: InkWell(
-                    onTap: hasText && !isSending ? _sendMessage : null,
+                    onTap: hasText
+                        ? _sendMessage // ✅ SIMPLIFIED - Just call _sendMessage
+                        : null,
                     borderRadius: BorderRadius.circular(24),
                     child: Container(
                       width: 48,
                       height: 48,
                       alignment: Alignment.center,
-                      child: isSending
-                          ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(Colors.white54),
-                        ),
-                      )
-                          : Icon(
+                      child: Icon(
                         Icons.send,
                         color: hasText ? Colors.white : Colors.white38,
                         size: 22,
