@@ -73,6 +73,25 @@
     },
     {
       "client_info": {
+        "mobilesdk_app_id": "1:467685361541:android:fb6566c6373a8f6606a6ec",
+        "android_client_info": {
+          "package_name": "com.praveendev.chattodo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDivmLl0hPtqx0D3qUpfc5HLf7FNJ-07fU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:467685361541:android:ffc3fdab80c2b44006a6ec",
         "android_client_info": {
           "package_name": "com.todo.todo"

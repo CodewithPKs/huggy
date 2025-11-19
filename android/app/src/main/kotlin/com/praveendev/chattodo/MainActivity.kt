@@ -1,4 +1,4 @@
-package com.todo.todo
+package com.praveendev.chattodo
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.FlutterFragmentActivity

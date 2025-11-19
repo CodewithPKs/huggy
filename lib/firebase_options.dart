@@ -58,7 +58,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDivmLl0hPtqx0D3qUpfc5HLf7FNJ-07fU',
-    appId: '1:467685361541:android:ffc3fdab80c2b44006a6ec',
+    appId: '1:467685361541:android:fb6566c6373a8f6606a6ec',
     messagingSenderId: '467685361541',
     projectId: 'khet-app-2025',
     storageBucket: 'khet-app-2025.firebasestorage.app',
@@ -66,11 +66,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyClH8XGgtQklH8d5V7SzPJoBsW7UvVQCT0',
-    appId: '1:467685361541:ios:cad29b2e6788c41906a6ec',
+    appId: '1:467685361541:ios:9939e8616b6f156406a6ec',
     messagingSenderId: '467685361541',
     projectId: 'khet-app-2025',
     storageBucket: 'khet-app-2025.firebasestorage.app',
     androidClientId: '467685361541-1ea8steq31umv0ukp7mtufd0bqdj8mlf.apps.googleusercontent.com',
-    iosBundleId: 'com.todo.todo',
+    iosBundleId: 'com.praveendev.chattodo',
   );
+
 }

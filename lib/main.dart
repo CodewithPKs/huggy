@@ -18,7 +18,8 @@ void main() async {
   );
 
 
-  const String myUid = '3a3b5601ce804feca23c1e502cecb3a0';
+  // const String myUid = '3a3b5601ce804feca23c1e502cecb3a0';
+  const int myUid = 164882;
   await TokenManager.refreshTokenAndSave(myUid);
 
   runApp(
@@ -27,7 +28,7 @@ void main() async {
         create: (_) => TextInputProvider(),
       ),
 
-      // Chat state (reply, sending, uploads) - Granular updates
+
       ChangeNotifierProvider(
         create: (_) => ChatStateProvider(),
       ),
