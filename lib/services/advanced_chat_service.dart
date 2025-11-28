@@ -5,6 +5,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:uuid/uuid.dart';
 
+import 'fcm_notification_service.dart';
+
 class AdvancedChatService {
   static final AdvancedChatService _instance = AdvancedChatService._internal();
 
@@ -16,6 +18,7 @@ class AdvancedChatService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: 'huggy');
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FCMNotificationService _fcmService = FCMNotificationService();
 
   // Collection paths
   static const String _conversationsPath = 'conversations';
@@ -110,6 +113,19 @@ class AdvancedChatService {
         'lastMessageTime': DateTime.now(),
       });
 
+      if (role == UserRole.admin) {
+        // Admin sends message → Fixed "EDUCATIONAL" content to user
+        await _fcmService.sendAdminToUserNotification();
+        print('✓ Educational notification sent to user');
+      } else if (role == UserRole.user) {
+        // User sends message → Trigger FCM to admin with message content
+        await _fcmService.sendUserToAdminNotification(
+          messageText: messageText,
+          userName: userName,
+        );
+        print('✓ Message notification sent to admin');
+      }
+
       print('✓ Message sent: $messageId in conversation: $chatId');
       return true;
     } catch (e) {
@@ -175,6 +191,15 @@ class AdvancedChatService {
         'lastMessageTime': DateTime.now(),
       });
 
+      if (role == UserRole.admin) {
+        await _fcmService.sendAdminToUserNotification();
+      } else if (role == UserRole.user) {
+        await _fcmService.sendUserToAdminNotification(
+          messageText: '📷 Sent an image',
+          userName: userName,
+        );
+      }
+
       print('✓ Image message sent: $messageId');
       return true;
     } catch (e) {
@@ -232,6 +257,15 @@ class AdvancedChatService {
         'lastMessage': '📎 Document: $fileName',
         'lastMessageTime': DateTime.now(),
       });
+
+      if (role == UserRole.admin) {
+        await _fcmService.sendAdminToUserNotification();
+      } else if (role == UserRole.user) {
+        await _fcmService.sendUserToAdminNotification(
+          messageText: '🎥 Sent a video',
+          userName: userName,
+        );
+      }
 
       print('✓ Document sent: $messageId');
       return true;
@@ -299,6 +333,15 @@ class AdvancedChatService {
         'lastMessage': messageText,
         'lastMessageTime': DateTime.now(),
       });
+
+      if (role == UserRole.admin) {
+        await _fcmService.sendAdminToUserNotification();
+      } else if (role == UserRole.user) {
+        await _fcmService.sendUserToAdminNotification(
+          messageText: '🎥 Sent a video',
+          userName: userName,
+        );
+      }
 
       print('✓ Reply sent: $messageId');
       return true;

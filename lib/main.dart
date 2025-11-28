@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:todo/provider/call_manager_provider.dart';
-import 'package:todo/screens/chat/enhanced_chat_screen.dart';
 import 'package:todo/screens/chat/user_chat_screen.dart';
 import 'package:todo/screens/todo/todo_home_screen.dart';
-import 'package:todo/services/token_manager.dart';
+import 'package:todo/services/fcm_notification_service.dart';
 import 'firebase_options.dart';
-import 'screens/auth/biometric_login_screen.dart';
 import 'theme/dark_theme.dart';
 
 void main() async {
@@ -17,7 +15,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-
+  await FCMNotificationService().initialize();
   // const String myUid = '3a3b5601ce804feca23c1e502cecb3a0';
   // const int myUid = 8839782589;
   // await TokenManager.refreshTokenAndSave(myUid);
