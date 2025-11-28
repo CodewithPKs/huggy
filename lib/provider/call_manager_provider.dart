@@ -1,4 +1,6 @@
 // File: lib/providers/call_manager_provider.dart
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import '../model/call_models.dart';
 
@@ -514,7 +516,7 @@ class CallManagerProvider extends ChangeNotifier {
 
   int _generateUid() {
     // Generate a semi-unique UID based on timestamp
-    return DateTime.now().millisecondsSinceEpoch % 1000000;
+    return Random().nextInt(4000000000);
   }
 
   /// Clear error message

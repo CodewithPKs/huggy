@@ -104,7 +104,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Commands: "Open the Praveen" or "Open the Admin"'),
+              content: Text(''),
               duration: Duration(seconds: 2),
             ),
           );
@@ -271,9 +271,9 @@ class _TodoHomeScreenState extends State<TodoHomeScreen>
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search tasks or type commands...',
-                    helperText:
-                    'Commands: "Open the Praveen" (chat) | "Open the Admin" (admin panel)',
+                    hintText: 'Search ...',
+                    // helperText:
+                    // 'Commands: "Open the Praveen" (chat) | "Open the Admin" (admin panel)',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(

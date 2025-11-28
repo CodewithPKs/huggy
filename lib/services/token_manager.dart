@@ -30,7 +30,7 @@ class TokenManager {
     try {
       final newToken = await fetchNewToken(uid);
 
-      AgoraConfig.tempToken = newToken;
+      // AgoraConfig.tempToken = newToken;
 
       print('✅ Agora token updated locally');
 

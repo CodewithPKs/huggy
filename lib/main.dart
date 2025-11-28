@@ -19,8 +19,8 @@ void main() async {
 
 
   // const String myUid = '3a3b5601ce804feca23c1e502cecb3a0';
-  const int myUid = 164882;
-  await TokenManager.refreshTokenAndSave(myUid);
+  // const int myUid = 8839782589;
+  // await TokenManager.refreshTokenAndSave(myUid);
 
   runApp(
     MultiProvider(providers: [
@@ -50,15 +50,15 @@ void main() async {
         create: (_) => VideoControllerProvider(),
       ),
 
-      ChangeNotifierProvider(
-        create: (_) => CallManagerProvider()
-          ..initialize(userId: 'personal_chat_001'), // Initialize with user ID
-      ),
-
       // ChangeNotifierProvider(
       //   create: (_) => CallManagerProvider()
-      //     ..initialize(userId: 'admin'), // Initialize with user ID
+      //     ..initialize(userId: 'personal_chat_001'), // Initialize with user ID
       // ),
+
+      ChangeNotifierProvider(
+        create: (_) => CallManagerProvider()
+          ..initialize(userId: 'admin'), // Initialize with user ID
+      ),
     ], child: const MyApp(),)
 
       );
