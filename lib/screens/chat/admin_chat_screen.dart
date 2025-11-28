@@ -42,22 +42,49 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   void _setupCallManager() {
     _callManager = Provider.of<CallManagerProvider>(context, listen: false);
 
-    // Initialize call manager with admin user ID
-    _callManager.initialize(userId: 'admin').then((_) {
-      print('✓ Admin call manager initialized');
+    // Listen for incoming calls
+    _callManager.listenForIncomingCalls(
+      userId: USER_ID,
+      onIncomingCall: (call) {
+        _showIncomingCallScreen(call);
+      },
+    );
 
-      // Listen for incoming calls
-      _callManager.listenForIncomingCalls(
-        userId: 'admin',
-        onIncomingCall: (call) {
-          print('📞 ADMIN: Incoming call from ${call.callerName}');
-          _showIncomingCallScreen(call);
-        },
-      );
+    // ✅ Listen for active call status changes
+    _listenForActiveCallChanges();
+  }
 
-      print('✓ Admin listening for incoming calls');
+// Add this new method
+  void _listenForActiveCallChanges() {
+    // This listens for changes in the current active call
+    _callManager.addListener(() {
+      // If call was active but now ended
+      if (_callManager.currentCallStatus == CallStatus.ended &&
+          Navigator.canPop(context)) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        // _showInfoSnackBar('Call ended by other user');/**/
+      }
     });
   }
+  // void _setupCallManager() {
+  //   _callManager = Provider.of<CallManagerProvider>(context, listen: false);
+  //
+  //   // Initialize call manager with admin user ID
+  //   _callManager.initialize(userId: 'admin').then((_) {
+  //     print('✓ Admin call manager initialized');
+  //
+  //     // Listen for incoming calls
+  //     _callManager.listenForIncomingCalls(
+  //       userId: 'admin',
+  //       onIncomingCall: (call) {
+  //         print('📞 ADMIN: Incoming call from ${call.callerName}');
+  //         _showIncomingCallScreen(call);
+  //       },
+  //     );
+  //
+  //     print('✓ Admin listening for incoming calls');
+  //   });
+  // }
 
   // 🔴 ADD THIS METHOD
   void _showIncomingCallScreen(CallModel call) {

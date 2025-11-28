@@ -49,6 +49,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
   final FocusNode _messageFocusNode = FocusNode();
 
   late CallManagerProvider _callManager;
+  StreamSubscription? _callEndSubscription;
 
   @override
   void initState() {
@@ -114,6 +115,17 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
     final call = _callManager.currentCall;
     if (call == null) return;
 
+    _callManager.listenForCallEnd(
+      callId: call.callId,
+      onCallEnded: () {
+
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+          _showInfoSnackBar('Call ended');
+        }
+      },
+    );
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => call.callType == CallType.voice
@@ -137,13 +149,22 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
           isCameraOn: _callManager.isCameraOn,
         ),
       ),
-    );
+    ).then((_) {
+      // ✅ Cleanup listener when returning from call screen
+      _callManager.cancelCallEndListener();
+    });
   }
 
-  void _endCall() {
-    _callManager.endCall().then((_) {
+  void _endCall() async {
+    final callId = _callManager.currentCall?.callId;
+
+
+    await _callManager.endCall();
+
+
+    if (mounted && Navigator.canPop(context)) {
       Navigator.pop(context);
-    });
+    }
   }
 
   Future<void> _initiateVoiceCall() async {
@@ -185,6 +206,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
     _scrollController.dispose();
     _messageFocusNode.dispose();
     context.read<VideoControllerProvider>().disposeAll();
+    _callManager.cancelCallEndListener();
     super.dispose();
   }
 

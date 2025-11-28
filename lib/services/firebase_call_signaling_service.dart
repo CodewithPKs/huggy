@@ -182,13 +182,54 @@ class FirebaseCallSignalingService {
   //   });
   // }
 
+  Stream<CallStatus?> watchCallEndStatus(String callId) {
+    return _firestore
+        .collection(_callsCollection)
+        .doc(callId)
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) return null;
+
+      final data = snapshot.data() as Map<String, dynamic>;
+      final status = data['status'] as String?;
+
+      // Return status if call has ended
+      if (status == 'ended' || status == 'rejected' || status == 'cancelled' || status == 'missed') {
+        return _parseCallStatus(status);
+      }
+
+      return null;
+    });
+  }
+
+  CallStatus _parseCallStatus(String? status) {
+    switch (status) {
+      case 'pending':
+        return CallStatus.pending;
+      case 'ringing':
+        return CallStatus.pending;
+      case 'accepted':
+        return CallStatus.accepted;
+      case 'rejected':
+        return CallStatus.rejected;
+      case 'ended':
+        return CallStatus.ended;
+      case 'cancelled':
+        return CallStatus.cancelled;
+      case 'missed':
+        return CallStatus.missed;
+      default:
+        return CallStatus.pending;
+    }
+  }
+
   Stream<List<CallModel>> getIncomingCallsStream(String userId) {
     print('👂 [FIREBASE] Listening for calls where receiverId == $userId');
 
     return _firestore
         .collection('calls')
         .where('receiverId', isEqualTo: userId)
-        .where('status', whereIn: ['ringing', 'pending'])// 🔴 Changed from 'ringing' to 'pending'
+        .where('status', whereIn: ['ringing'])
         .orderBy('timestamp', descending: true)
         .limit(1)
         .snapshots()

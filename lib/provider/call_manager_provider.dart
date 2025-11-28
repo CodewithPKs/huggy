@@ -1,4 +1,5 @@
 // File: lib/providers/call_manager_provider.dart
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,45 @@ class CallManagerProvider extends ChangeNotifier {
   final FirebaseCallSignalingService _signaling =
   FirebaseCallSignalingService();
   final AgoraCallService _agoraService = AgoraCallService();
+
+  StreamSubscription<CallStatus?>? _callEndSubscription;
+
+
+  void listenForCallEnd({
+    required String callId,
+    required VoidCallback onCallEnded,
+  }) {
+    _callEndSubscription?.cancel(); // Cancel previous subscription
+
+    _callEndSubscription = _signaling.watchCallEndStatus(callId).listen((status) {
+      if (status != null) {
+        print('🔴 Call ended with status: $status');
+
+        // Cleanup and trigger callback
+        _currentCall = null;
+        _currentCallStatus = CallStatus.ended;
+        _isMuted = false;
+        _isCameraOn = true;
+        _remoteUid = 0;
+
+        notifyListeners();
+
+        // Trigger callback to navigate back
+        onCallEnded();
+
+        // Cancel subscription after call ends
+        _callEndSubscription?.cancel();
+        _callEndSubscription = null;
+      }
+    });
+  }
+
+  /// Cancel call end listener
+  void cancelCallEndListener() {
+    _callEndSubscription?.cancel();
+    _callEndSubscription = null;
+  }
+
 
   // Current call state
   CallModel? _currentCall;
@@ -525,10 +565,13 @@ class CallManagerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cleanup
+
+  /// Update dispose method
   @override
   void dispose() {
+    _callEndSubscription?.cancel();
     _agoraService.clearCallbacks();
     super.dispose();
   }
+
 }
