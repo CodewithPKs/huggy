@@ -54,13 +54,14 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
   @override
   void initState() {
     super.initState();
-    _markMessagesAsRead();
+    // _markMessagesAsRead();
     // Initialize providers
     _initializeProviders();
     _setupCallManager();
   }
 
   ///Calls
+
 
   void _setupCallManager() {
     _callManager = Provider.of<CallManagerProvider>(context, listen: false);
@@ -212,6 +213,7 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
 
   Future<void> _markMessagesAsRead() async {
     try {
+
       await _chatService.markAllMessagesAsRead(
         conversationId: widget.conversationId,
       );
@@ -733,6 +735,14 @@ class _EnhancedUserChatScreenState extends State<EnhancedUserChatScreen> {
                             currentTimestamp,
                             previousTimestamp,
                           );
+
+                          if (message['isRead'] == false &&
+                              message['senderId'] != widget.userId) {
+                            _chatService.markMessageAsRead(
+                              conversationId: widget.conversationId,
+                              messageId: message.id,
+                            );
+                          }
 
                           return Column(
                             children: [

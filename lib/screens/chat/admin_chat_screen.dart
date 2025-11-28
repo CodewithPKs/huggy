@@ -240,7 +240,7 @@ class _AdminConversationViewState extends State<_AdminConversationView> {
   void initState() {
     super.initState();
     _loadConversationData();
-    _markMessagesAsRead();
+    // _markMessagesAsRead();
   }
 
   @override
@@ -630,8 +630,7 @@ class _AdminConversationViewState extends State<_AdminConversationView> {
                 itemBuilder: (context, index) {
                   final message = messages[index];
                   // Mark as read when displayed
-                  if (message['isRead'] == false &&
-                      message['role'] != 'admin') {
+                  if (message['isRead'] == false && message['senderId'] != ADMIN_ID) {
                     _chatService.markMessageAsRead(
                       conversationId: widget.conversationId,
                       messageId: message.id,
